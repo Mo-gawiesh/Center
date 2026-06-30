@@ -68,57 +68,8 @@
 
 
 /* ================================================
-   3. TYPING EFFECT (HERO)
+   3. TYPING EFFECT (HERO) - Removed for mobile performance optimization
    ================================================ */
-(function initTyping() {
-  const el = document.getElementById('typing-word');
-  if (!el) return;
-
-  const words = ['للأجهزة المنزلية', 'للغسالات', 'للثلاجات', 'للبوتاجازات', 'للتكييفات', 'للديب فريزر'];
-  let wordIndex = 0;
-  let charIndex = 0;
-  let isDeleting = false;
-  const typingSpeed  = 100;
-  const deletingSpeed = 60;
-  const pauseTime    = 1800;
-
-  function type() {
-    const current = words[wordIndex];
-
-    if (isDeleting) {
-      el.textContent = current.slice(0, charIndex - 1);
-      charIndex--;
-    } else {
-      el.textContent = current.slice(0, charIndex + 1);
-      charIndex++;
-    }
-
-    if (!isDeleting && charIndex === current.length) {
-      setTimeout(() => { isDeleting = true; type(); }, pauseTime);
-      return;
-    }
-
-    if (isDeleting && charIndex === 0) {
-      isDeleting = false;
-      wordIndex = (wordIndex + 1) % words.length;
-    }
-
-    setTimeout(type, isDeleting ? deletingSpeed : typingSpeed);
-  }
-
-  // Respect reduced motion
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    el.textContent = words[0];
-    return;
-  }
-
-  // Start with a pause on the first word, then start deleting
-  setTimeout(() => {
-    isDeleting = true;
-    charIndex = words[0].length;
-    type();
-  }, pauseTime);
-})();
 
 
 /* ================================================

@@ -1993,6 +1993,27 @@ button {
   line-height: 1.6;
 }
 
+.footer-crafted {
+  width: 100%;
+  text-align: center;
+  margin-top: var(--sp-3);
+  font-size: 0.82rem;
+  color: var(--clr-text-faint);
+  font-family: var(--font-latin);
+}
+
+.footer-crafted a {
+  color: var(--clr-primary);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color var(--tr-fast);
+}
+
+.footer-crafted a:hover {
+  color: var(--clr-primary-dark);
+  text-decoration: underline;
+}
+
 /* ===================================================
    SCROLL REVEAL ANIMATIONS
    =================================================== */

@@ -15,6 +15,87 @@
     <link rel="stylesheet" href="../css/style.css" />
     <script
         type="application/ld+json">{"@context":"https://schema.org","@type":"Service","name":"صيانة Beko","provider":{"@type":"LocalBusiness","name":"الهندسية للتوكيلات","telephone":"+2016481"},"areaServed":"Egypt"}</script>
+  <!-- Security Lock to prevent copying/inspecting -->
+  <style>
+    * {
+      -webkit-user-select: none !important;
+      -moz-user-select: none !important;
+      -ms-user-select: none !important;
+      user-select: none !important;
+    }
+    input, textarea, select {
+      -webkit-user-select: text !important;
+      -moz-user-select: text !important;
+      -ms-user-select: text !important;
+      user-select: text !important;
+    }
+  </style>
+  <script>
+    (function() {
+      // 1. Prevent right click
+      document.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+      });
+
+      // 2. Prevent selection start
+      document.addEventListener('selectstart', function(e) {
+        e.preventDefault();
+      });
+
+      // 3. Prevent copy, cut, paste, drag
+      document.addEventListener('copy', function(e) { e.preventDefault(); });
+      document.addEventListener('cut', function(e) { e.preventDefault(); });
+      document.addEventListener('paste', function(e) { e.preventDefault(); });
+      document.addEventListener('dragstart', function(e) { e.preventDefault(); });
+
+      // 4. Prevent keyboard shortcuts
+      document.addEventListener('keydown', function(e) {
+        var isCtrlOrCmd = e.ctrlKey || e.metaKey;
+        var key = e.key.toLowerCase();
+
+        // F12
+        if (e.key === 'F12') {
+          e.preventDefault();
+          return false;
+        }
+
+        // Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C
+        if (isCtrlOrCmd && e.shiftKey && (key === 'i' || key === 'j' || key === 'c')) {
+          e.preventDefault();
+          return false;
+        }
+
+        // Ctrl+U
+        if (isCtrlOrCmd && key === 'u') {
+          e.preventDefault();
+          return false;
+        }
+
+        // Ctrl+S
+        if (isCtrlOrCmd && key === 's') {
+          e.preventDefault();
+          return false;
+        }
+
+        // Ctrl+C, Ctrl+X, Ctrl+A
+        if (isCtrlOrCmd && (key === 'c' || key === 'x' || key === 'a')) {
+          e.preventDefault();
+          return false;
+        }
+      });
+
+      // 5. DevTools Blocker (Debugger Loop)
+      setInterval(function() {
+        try {
+          (function() {
+            return false;
+          }
+          .constructor('debugger')
+          .call());
+        } catch (err) {}
+      }, 50);
+    })();
+  </script>
 </head>
 
 <body>

@@ -3269,3 +3269,12 @@ button {
 .back-to-top-btn:hover svg {
   transform: translateY(-2px);
 }
+
+/* Prevent text selection globally */
+html, body {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+

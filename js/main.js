@@ -268,3 +268,51 @@ document.querySelectorAll('a[href^="#"]').forEach(link => {
     form.reset();
   };
 })();
+
+/* ================================================
+   11. PREVENT COPY, RIGHT-CLICK & INSPECT (SECURITY LOCK)
+   ================================================ */
+(function initSecurityLock() {
+  // Prevent right-click context menu
+  document.addEventListener('contextmenu', e => e.preventDefault());
+
+  // Prevent dragging of elements (images, text, etc.)
+  document.addEventListener('dragstart', e => e.preventDefault());
+
+  // Prevent inspect element keyboard shortcuts
+  document.addEventListener('keydown', e => {
+    const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+    const key = e.key.toLowerCase();
+
+    // Disable F12
+    if (e.key === 'F12') {
+      e.preventDefault();
+      return false;
+    }
+
+    // Disable Ctrl+Shift+I (Inspect), Ctrl+Shift+J (Console), Ctrl+Shift+C (Inspector)
+    if (isCtrlOrCmd && e.shiftKey && (key === 'i' || key === 'j' || key === 'c')) {
+      e.preventDefault();
+      return false;
+    }
+
+    // Disable Ctrl+U (View Source)
+    if (isCtrlOrCmd && key === 'u') {
+      e.preventDefault();
+      return false;
+    }
+
+    // Disable Ctrl+S (Save)
+    if (isCtrlOrCmd && key === 's') {
+      e.preventDefault();
+      return false;
+    }
+
+    // Disable Ctrl+C, Ctrl+X, Ctrl+A (Copy, Cut, Select All)
+    if (isCtrlOrCmd && (key === 'c' || key === 'x' || key === 'a')) {
+      e.preventDefault();
+      return false;
+    }
+  });
+})();
+

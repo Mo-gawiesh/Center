@@ -42,6 +42,9 @@ function withTimeout(promise, ms, errorMsg) {
 }
 
 async function initClerk() {
+  console.log("[Dashboard] Clerk UI script loaded");
+  console.log("[Dashboard] Clerk JS script loaded");
+  console.log("[Dashboard] Clerk UI constructor available:", !!window.__internal_ClerkUICtor);
   console.log("[Dashboard] Clerk initialization started");
   const clerk = window.Clerk;
   if (!clerk) {
@@ -50,7 +53,12 @@ async function initClerk() {
   }
   console.log("[Dashboard] Clerk instance created");
   console.log("[Dashboard] Clerk.load started");
-  await clerk.load({ publishableKey: CLERK_KEY });
+  await clerk.load({
+    publishableKey: CLERK_KEY,
+    ui: {
+      ClerkUI: window.__internal_ClerkUICtor
+    }
+  });
   console.log("[Dashboard] Clerk.load completed");
   return clerk;
 }

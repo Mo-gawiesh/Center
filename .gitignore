@@ -9,8 +9,6 @@ node_modules/
 # Convex generated files
 convex/_generated/
 
-# Build output
-dashboard/bundle.js
 
 # Python
 __pycache__/

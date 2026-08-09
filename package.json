@@ -4,6 +4,7 @@
   "description": "الهندسية للتوكيلات - Admin Dashboard & Analytics",
   "type": "module",
   "scripts": {
+    "build": "npm run build:dashboard",
     "build:dashboard": "node build-dashboard.mjs",
     "convex:dev": "npx convex dev",
     "convex:deploy": "npx convex deploy"

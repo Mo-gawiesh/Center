@@ -42,9 +42,9 @@ function withTimeout(promise, ms, errorMsg) {
 }
 
 async function initClerk() {
-  console.log("[Dashboard] Clerk UI script loaded");
-  console.log("[Dashboard] Clerk JS script loaded");
-  console.log("[Dashboard] Clerk UI constructor available:", !!window.__internal_ClerkUICtor);
+  console.log('[Clerk] UI constructor:', window.__internal_ClerkUICtor);
+  console.log('[Clerk] UI constructor type:', typeof window.__internal_ClerkUICtor);
+  console.log('[Clerk] Clerk available:', !!window.Clerk);
   console.log("[Dashboard] Clerk initialization started");
   const clerk = window.Clerk;
   if (!clerk) {

@@ -4213,10 +4213,32 @@ var HCDashboard = (() => {
     throw new Error("Missing CONVEX_URL or CLERK_KEY config");
   }
   var convex = new ConvexClient(CONVEX_URL);
+  function withTimeout(promise, ms, errorMsg) {
+    let timeoutId;
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => {
+        reject(new Error(errorMsg));
+      }, ms);
+    });
+    return Promise.race([
+      promise.then((res) => {
+        clearTimeout(timeoutId);
+        return res;
+      }),
+      timeoutPromise
+    ]);
+  }
   async function initClerk() {
+    console.log("[Dashboard] Clerk initialization started");
     const clerk = window.Clerk;
-    if (!clerk) throw new Error("Clerk script not loaded");
+    if (!clerk) {
+      console.log("[Dashboard] Clerk initialization failed: Clerk script not loaded");
+      throw new Error("Clerk script not loaded");
+    }
+    console.log("[Dashboard] Clerk instance created");
+    console.log("[Dashboard] Clerk.load started");
     await clerk.load({ publishableKey: CLERK_KEY });
+    console.log("[Dashboard] Clerk.load completed");
     return clerk;
   }
   function getDateRange(rangeKey) {
@@ -5445,237 +5467,269 @@ viewer \u2014 \u0645\u0634\u0627\u0647\u062F
     }
   }
   (async function main() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
-    try {
-      const clerk = await initClerk();
-      if (!clerk.user) {
-        document.getElementById("auth-wall").hidden = false;
-        document.getElementById("dashboard-app").hidden = true;
-        clerk.mountSignIn(document.getElementById("clerk-sign-in"), {
-          forceRedirectUrl: "/dashboard/"
-        });
-        return;
+    console.log("[Dashboard] script started");
+    console.log("[Dashboard] Clerk script available:", !!window.Clerk);
+    async function runInit() {
+      var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j;
+      const loadingEl = document.getElementById("clerk-loading");
+      if (loadingEl) {
+        loadingEl.style.display = "flex";
+        loadingEl.innerHTML = `
+        <div class="spinner"></div>
+        <p>\u062C\u0627\u0631\u064A \u062A\u062D\u0645\u064A\u0644 \u0644\u0648\u062D\u0629 \u0627\u0644\u062A\u062D\u0643\u0645...</p>
+      `;
       }
-      convex.setAuth(async () => {
-        var _a3;
-        try {
-          const token = await ((_a3 = clerk.session) == null ? void 0 : _a3.getToken({ template: "convex" }));
-          return token != null ? token : null;
-        } catch {
-          return null;
-        }
-      });
-      document.getElementById("auth-wall").hidden = true;
-      document.getElementById("dashboard-app").hidden = false;
-      const user = clerk.user;
-      const name = (_c = (_b2 = user.fullName) != null ? _b2 : (_a2 = user.primaryEmailAddress) == null ? void 0 : _a2.emailAddress) != null ? _c : "Admin";
-      const avatar = user.imageUrl;
-      const userNameEl = document.getElementById("user-name");
-      const userAvatarEl = document.getElementById("user-avatar");
-      if (userNameEl) userNameEl.textContent = name;
-      if (userAvatarEl && avatar) {
-        userAvatarEl.src = avatar;
-        userAvatarEl.hidden = false;
-      }
-      (_d = document.getElementById("sign-out-btn")) == null ? void 0 : _d.addEventListener("click", async () => {
-        clearSubs();
-        await clerk.signOut();
-        window.location.reload();
-      });
-      document.querySelectorAll(".nav-item[data-section]").forEach((item) => {
-        item.addEventListener("click", () => showSection(item.dataset.section));
-      });
-      let activeRange = "7d";
-      const handleRangeChange = (range) => {
-        activeRange = range;
-        document.querySelectorAll("[data-range], [data-anal-range]").forEach((b) => {
-          if (b.dataset.range === range || b.dataset.anal - range === range || b.dataset.analRange === range) {
-            b.classList.add("range-active");
-          } else {
-            b.classList.remove("range-active");
-          }
-        });
-        subscribeAll(activeRange);
-      };
-      document.querySelectorAll("[data-range]").forEach((btn) => {
-        btn.addEventListener("click", () => handleRangeChange(btn.dataset.range));
-      });
-      document.querySelectorAll("[data-anal-range]").forEach((btn) => {
-        btn.addEventListener("click", () => handleRangeChange(btn.dataset.analRange || btn.getAttribute("data-anal-range")));
-      });
-      const overlay = document.createElement("div");
-      overlay.id = "sidebar-overlay";
-      overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:199;display:none;backdrop-filter:blur(2px);";
-      document.body.appendChild(overlay);
-      const openSidebar = () => {
-        var _a3;
-        (_a3 = document.getElementById("sidebar")) == null ? void 0 : _a3.classList.add("open");
-        overlay.style.display = "block";
-      };
-      const closeSidebar = () => {
-        var _a3;
-        (_a3 = document.getElementById("sidebar")) == null ? void 0 : _a3.classList.remove("open");
-        overlay.style.display = "none";
-      };
-      (_e = document.getElementById("sidebar-toggle")) == null ? void 0 : _e.addEventListener("click", closeSidebar);
-      (_f = document.getElementById("sidebar-toggle-hamburger")) == null ? void 0 : _f.addEventListener("click", openSidebar);
-      overlay.addEventListener("click", closeSidebar);
-      (_g = document.getElementById("link-show-all-pages")) == null ? void 0 : _g.addEventListener("click", (e) => {
-        e.preventDefault();
-        showSection("pages");
-      });
-      const settingsForm = document.getElementById("settings-form");
-      if (settingsForm) {
-        settingsForm.addEventListener("submit", async (e) => {
-          var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2, _i2, _j, _k;
-          e.preventDefault();
-          const saveBtn = settingsForm.querySelector("button[type='submit']");
-          const origText = saveBtn ? saveBtn.textContent : "\u062D\u0641\u0638 \u0627\u0644\u062A\u063A\u064A\u064A\u0631\u0627\u062A";
-          if (saveBtn) {
-            saveBtn.disabled = true;
-            saveBtn.textContent = "\u062C\u0627\u0631\u064A \u0627\u0644\u062D\u0641\u0638...";
-          }
-          const payload = {
-            whatsappNumber: ((_a3 = document.getElementById("set-whatsapp")) == null ? void 0 : _a3.value) || "",
-            hotlineNumber: ((_b3 = document.getElementById("set-hotline")) == null ? void 0 : _b3.value) || "",
-            workingHours: ((_c2 = document.getElementById("set-hours")) == null ? void 0 : _c2.value) || "",
-            contactEmail: ((_d2 = document.getElementById("set-email")) == null ? void 0 : _d2.value) || "",
-            heroTitle: ((_e2 = document.getElementById("set-hero-title")) == null ? void 0 : _e2.value) || "",
-            heroSubtitle: ((_f2 = document.getElementById("set-hero-sub")) == null ? void 0 : _f2.value) || "",
-            servicesTitle: ((_g2 = document.getElementById("set-services-title")) == null ? void 0 : _g2.value) || "",
-            servicesSubtitle: ((_h2 = document.getElementById("set-services-sub")) == null ? void 0 : _h2.value) || "",
-            testimonialsTitle: ((_i2 = document.getElementById("set-testimonials-title")) == null ? void 0 : _i2.value) || "",
-            whyUsTitle: ((_j = document.getElementById("set-why-title")) == null ? void 0 : _j.value) || "",
-            whyUsSubtitle: ((_k = document.getElementById("set-why-sub")) == null ? void 0 : _k.value) || ""
-          };
-          try {
-            await convex.mutation("analytics:updateSettings", payload);
-            alert("\u062A\u0645 \u062D\u0641\u0638 \u0625\u0639\u062F\u0627\u062F\u0627\u062A \u0627\u0644\u0645\u0648\u0642\u0639 \u0648\u062A\u062D\u062F\u064A\u062B \u0627\u0644\u0635\u0641\u062D\u0627\u062A \u0628\u0646\u062C\u0627\u062D! \u{1F389}");
-          } catch (err) {
-            console.error("Save settings error:", err);
-            alert("\u062E\u0637\u0623 \u0623\u062B\u0646\u0627\u0621 \u062D\u0641\u0638 \u0627\u0644\u062A\u063A\u064A\u064A\u0631\u0627\u062A: " + err.message);
-          } finally {
-            if (saveBtn) {
-              saveBtn.disabled = false;
-              saveBtn.textContent = origText;
-            }
-          }
-        });
-      }
-      const mockBtn = document.getElementById("btn-generate-mock");
-      if (mockBtn) {
-        mockBtn.addEventListener("click", async () => {
-          const statusEl = document.getElementById("mock-status");
-          if (!statusEl) return;
-          statusEl.style.display = "block";
-          statusEl.style.background = "#f59e0b";
-          statusEl.style.color = "#1e1b4b";
-          statusEl.textContent = "\u062C\u0627\u0631\u064A \u0625\u0646\u0634\u0627\u0621 \u0623\u0643\u062B\u0631 \u0645\u0646 150 \u062D\u062F\u062B \u0625\u062D\u0635\u0627\u0626\u064A \u0639\u0634\u0648\u0627\u0626\u064A...";
-          try {
-            await convex.mutation("analytics:populateMockData", {});
-            statusEl.style.background = "#10b981";
-            statusEl.style.color = "#fff";
-            statusEl.textContent = "\u062A\u0645 \u062A\u0648\u0644\u064A\u062F \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0648\u0647\u0645\u064A\u0629 \u0644\u0644\u0640 30 \u064A\u0648\u0645\u0627\u064B \u0627\u0644\u0645\u0627\u0636\u064A\u0629 \u0628\u0646\u062C\u0627\u062D!";
-            setTimeout(() => {
-              statusEl.style.display = "none";
-            }, 3e3);
-          } catch (err) {
-            statusEl.style.background = "#ef4444";
-            statusEl.style.color = "#fff";
-            statusEl.textContent = "\u062E\u0637\u0623: " + err.message;
-          }
-        });
-      }
-      const reqSearchInput = document.getElementById("requests-search-input");
-      if (reqSearchInput) {
-        reqSearchInput.addEventListener("input", (e) => {
-          _searchQuery = e.target.value.trim();
-          subscribeRequests();
-        });
-      }
-      const reqStatusFilter = document.getElementById("requests-status-filter");
-      if (reqStatusFilter) {
-        reqStatusFilter.addEventListener("change", (e) => {
-          _statusFilter = e.target.value;
-          subscribeRequests();
-        });
-      }
-      const openAddReqBtn = document.getElementById("btn-open-add-request");
-      if (openAddReqBtn) {
-        openAddReqBtn.addEventListener("click", () => {
-          document.getElementById("edit-modal-title").textContent = "\u2795 \u0625\u0636\u0627\u0641\u0629 \u0637\u0644\u0628 \u0635\u064A\u0627\u0646\u0629 \u062C\u062F\u064A\u062F";
-          document.getElementById("edit-req-id").value = "";
-          document.getElementById("edit-req-name").value = "";
-          document.getElementById("edit-req-phone").value = "";
-          document.getElementById("edit-req-appliance").value = "";
-          document.getElementById("edit-req-problem").value = "\u0635\u064A\u0627\u0646\u0629 \u0639\u0627\u0645\u0629";
-          document.getElementById("edit-req-gov").value = "\u0627\u0644\u0642\u0627\u0647\u0631\u0629";
-          document.getElementById("edit-req-page").value = "DASHBOARD";
-          document.getElementById("edit-req-status-select").value = "new";
-          document.getElementById("modal-edit-request").style.display = "flex";
-        });
-      }
-      const editReqForm = document.getElementById("edit-request-form");
-      if (editReqForm) {
-        editReqForm.addEventListener("submit", async (e) => {
-          e.preventDefault();
-          const saveBtn = editReqForm.querySelector("button[type='submit']");
-          const origText = saveBtn ? saveBtn.textContent : "\u062D\u0641\u0638";
-          if (saveBtn) {
-            saveBtn.disabled = true;
-            saveBtn.textContent = "\u062C\u0627\u0631\u064A \u0627\u0644\u062D\u0641\u0638...";
-          }
-          const id = document.getElementById("edit-req-id").value;
-          const payload = {
-            clientName: document.getElementById("edit-req-name").value,
-            clientPhone: document.getElementById("edit-req-phone").value,
-            appliance: document.getElementById("edit-req-appliance").value,
-            problem: document.getElementById("edit-req-problem").value,
-            governorate: document.getElementById("edit-req-gov").value,
-            sourcePage: document.getElementById("edit-req-page").value,
-            status: document.getElementById("edit-req-status-select").value
-          };
-          try {
-            if (id) {
-              await convex.mutation("analytics:editRequest", { id, ...payload });
-            } else {
-              await convex.mutation("analytics:createRequestDashboard", payload);
-            }
-            document.getElementById("modal-edit-request").style.display = "none";
-          } catch (err) {
-            alert("\u062E\u0637\u0623 \u0623\u062B\u0646\u0627\u0621 \u0627\u0644\u062D\u0641\u0638: " + err.message);
-          } finally {
-            if (saveBtn) {
-              saveBtn.disabled = false;
-              saveBtn.textContent = origText;
-            }
-          }
-        });
-      }
-      showSection("overview");
-      subscribeAll(activeRange);
-      subscribeRequests();
-      const clerkId = clerk.user.id;
-      const email = (_i = (_h = clerk.user.primaryEmailAddress) == null ? void 0 : _h.emailAddress) != null ? _i : "";
       try {
-        await convex.mutation("analytics:registerCurrentUser", {
-          name,
-          email,
-          avatarUrl: avatar || void 0
+        const clerk = await withTimeout(initClerk(), 1e4, "TIMEOUT");
+        console.log("[Dashboard] Clerk initialized");
+        console.log("[Dashboard] session state:", clerk.session ? "Active" : "None");
+        console.log("[Dashboard] user state:", clerk.user ? clerk.user.id : "Signed out");
+        if (!clerk.user) {
+          console.log("[Dashboard] rendering sign-in");
+          const cardEl = document.getElementById("auth-card");
+          if (loadingEl) loadingEl.style.display = "none";
+          if (cardEl) cardEl.style.display = "block";
+          document.getElementById("auth-wall").hidden = false;
+          document.getElementById("dashboard-app").hidden = true;
+          clerk.mountSignIn(document.getElementById("clerk-sign-in"), {
+            forceRedirectUrl: "/dashboard/"
+          });
+          return;
+        }
+        console.log("[Dashboard] rendering dashboard");
+        document.getElementById("auth-wall").hidden = true;
+        document.getElementById("dashboard-app").hidden = false;
+        convex.setAuth(async () => {
+          var _a3;
+          try {
+            const token = await ((_a3 = clerk.session) == null ? void 0 : _a3.getToken({ template: "convex" }));
+            return token != null ? token : null;
+          } catch {
+            return null;
+          }
         });
-      } catch (e) {
-        console.warn("Could not register user in Convex:", e);
-      }
-      subscribeUsers(clerkId);
-      initUsersSection(clerkId);
-      initSystemSettings();
-    } catch (err) {
-      console.error("Dashboard init error:", err);
-      const bootErr = document.getElementById("boot-error");
-      if (bootErr) {
-        bootErr.textContent = "\u062E\u0637\u0623 \u0641\u064A \u062A\u0647\u064A\u0626\u0629 \u0644\u0648\u062D\u0629 \u0627\u0644\u062A\u062D\u0643\u0645: " + err.message;
-        bootErr.style.display = "block";
+        const user = clerk.user;
+        const name = (_c = (_b2 = user.fullName) != null ? _b2 : (_a2 = user.primaryEmailAddress) == null ? void 0 : _a2.emailAddress) != null ? _c : "Admin";
+        const avatar = user.imageUrl;
+        const userNameEl = document.getElementById("user-name");
+        const userAvatarEl = document.getElementById("user-avatar");
+        if (userNameEl) userNameEl.textContent = name;
+        if (userAvatarEl && avatar) {
+          userAvatarEl.src = avatar;
+          userAvatarEl.hidden = false;
+        }
+        (_d = document.getElementById("sign-out-btn")) == null ? void 0 : _d.addEventListener("click", async () => {
+          clearSubs();
+          await clerk.signOut();
+          window.location.reload();
+        });
+        document.querySelectorAll(".nav-item[data-section]").forEach((item) => {
+          item.addEventListener("click", () => showSection(item.dataset.section));
+        });
+        let activeRange = "7d";
+        const handleRangeChange = (range) => {
+          activeRange = range;
+          document.querySelectorAll("[data-range], [data-anal-range]").forEach((b) => {
+            if (b.dataset.range === range || b.dataset.anal_range === range || b.dataset.analRange === range) {
+              b.classList.add("range-active");
+            } else {
+              b.classList.remove("range-active");
+            }
+          });
+          subscribeAll(activeRange);
+        };
+        document.querySelectorAll("[data-range]").forEach((btn) => {
+          btn.addEventListener("click", () => handleRangeChange(btn.dataset.range));
+        });
+        document.querySelectorAll("[data-anal-range]").forEach((btn) => {
+          btn.addEventListener("click", () => handleRangeChange(btn.dataset.analRange || btn.getAttribute("data-anal-range")));
+        });
+        const overlay = document.getElementById("sidebar-overlay") || document.createElement("div");
+        if (!overlay.id) {
+          overlay.id = "sidebar-overlay";
+          overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:199;display:none;backdrop-filter:blur(2px);";
+          document.body.appendChild(overlay);
+        }
+        const openSidebar = () => {
+          var _a3;
+          (_a3 = document.getElementById("sidebar")) == null ? void 0 : _a3.classList.add("open");
+          overlay.style.display = "block";
+        };
+        const closeSidebar = () => {
+          var _a3;
+          (_a3 = document.getElementById("sidebar")) == null ? void 0 : _a3.classList.remove("open");
+          overlay.style.display = "none";
+        };
+        (_e = document.getElementById("sidebar-toggle")) == null ? void 0 : _e.addEventListener("click", closeSidebar);
+        (_f = document.getElementById("sidebar-toggle-hamburger")) == null ? void 0 : _f.addEventListener("click", openSidebar);
+        overlay.addEventListener("click", closeSidebar);
+        (_g = document.getElementById("link-show-all-pages")) == null ? void 0 : _g.addEventListener("click", (e) => {
+          e.preventDefault();
+          showSection("pages");
+        });
+        const settingsForm = document.getElementById("settings-form");
+        if (settingsForm) {
+          settingsForm.addEventListener("submit", async (e) => {
+            var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k;
+            e.preventDefault();
+            const saveBtn = settingsForm.querySelector("button[type='submit']");
+            const origText = saveBtn ? saveBtn.textContent : "\u062D\u0641\u0638 \u0627\u0644\u062A\u063A\u064A\u064A\u0631\u0627\u062A";
+            if (saveBtn) {
+              saveBtn.disabled = true;
+              saveBtn.textContent = "\u062C\u0627\u0631\u064A \u0627\u0644\u062D\u0641\u0638...";
+            }
+            const payload = {
+              whatsappNumber: ((_a3 = document.getElementById("set-whatsapp")) == null ? void 0 : _a3.value) || "",
+              hotlineNumber: ((_b3 = document.getElementById("set-hotline")) == null ? void 0 : _b3.value) || "",
+              workingHours: ((_c2 = document.getElementById("set-hours")) == null ? void 0 : _c2.value) || "",
+              contactEmail: ((_d2 = document.getElementById("set-email")) == null ? void 0 : _d2.value) || "",
+              heroTitle: ((_e2 = document.getElementById("set-hero-title")) == null ? void 0 : _e2.value) || "",
+              heroSubtitle: ((_f2 = document.getElementById("set-hero-sub")) == null ? void 0 : _f2.value) || "",
+              servicesTitle: ((_g2 = document.getElementById("set-services-title")) == null ? void 0 : _g2.value) || "",
+              servicesSubtitle: ((_h2 = document.getElementById("set-services-sub")) == null ? void 0 : _h2.value) || "",
+              testimonialsTitle: ((_i2 = document.getElementById("set-testimonials-title")) == null ? void 0 : _i2.value) || "",
+              whyUsTitle: ((_j2 = document.getElementById("set-why-title")) == null ? void 0 : _j2.value) || "",
+              whyUsSubtitle: ((_k = document.getElementById("set-why-sub")) == null ? void 0 : _k.value) || ""
+            };
+            try {
+              await convex.mutation("analytics:updateSettings", payload);
+              alert("\u062A\u0645 \u062D\u0641\u0638 \u0625\u0639\u062F\u0627\u062F\u0627\u062A \u0627\u0644\u0645\u0648\u0642\u0639 \u0648\u062A\u062D\u062F\u064A\u062B \u0627\u0644\u0635\u0641\u062D\u0627\u062A \u0628\u0646\u062C\u0627\u062D! \u{1F389}");
+            } catch (err) {
+              console.error("Save settings error:", err);
+              alert("\u062E\u0637\u0623 \u0623\u062B\u0646\u0627\u0621 \u062D\u0641\u0638 \u0627\u0644\u062A\u063A\u064A\u064A\u0631\u0627\u062A: " + err.message);
+            } finally {
+              if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = origText;
+              }
+            }
+          });
+        }
+        const mockBtn = document.getElementById("btn-generate-mock");
+        if (mockBtn) {
+          mockBtn.addEventListener("click", async () => {
+            const statusEl = document.getElementById("mock-status");
+            if (!statusEl) return;
+            statusEl.style.display = "block";
+            statusEl.style.background = "#f59e0b";
+            statusEl.style.color = "#1e1b4b";
+            statusEl.textContent = "\u062C\u0627\u0631\u064A \u0625\u0646\u0634\u0627\u0621 \u0623\u0643\u062B\u0631 \u0645\u0646 150 \u062D\u062F\u062B \u0625\u062D\u0635\u0627\u0626\u064A \u0639\u0634\u0648\u0627\u0626\u064A...";
+            try {
+              await convex.mutation("analytics:populateMockData", {});
+              statusEl.style.background = "#10b981";
+              statusEl.style.color = "#fff";
+              statusEl.textContent = "\u062A\u0645 \u062A\u0648\u0644\u064A\u062F \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0648\u0647\u0645\u064A\u0629 \u0644\u0644\u0640 30 \u064A\u0648\u0645\u0627\u064B \u0627\u0644\u0645\u0627\u0636\u064A\u0629 \u0628\u0646\u062C\u0627\u062D!";
+              setTimeout(() => {
+                statusEl.style.display = "none";
+              }, 3e3);
+            } catch (err) {
+              statusEl.style.background = "#ef4444";
+              statusEl.style.color = "#fff";
+              statusEl.textContent = "\u062E\u0637\u0623: " + err.message;
+            }
+          });
+        }
+        const reqSearchInput = document.getElementById("requests-search-input");
+        if (reqSearchInput) {
+          reqSearchInput.addEventListener("input", (e) => {
+            _searchQuery = e.target.value.trim();
+            subscribeRequests();
+          });
+        }
+        const reqStatusFilter = document.getElementById("requests-status-filter");
+        if (reqStatusFilter) {
+          reqStatusFilter.addEventListener("change", (e) => {
+            _statusFilter = e.target.value;
+            subscribeRequests();
+          });
+        }
+        const openAddReqBtn = document.getElementById("btn-open-add-request");
+        if (openAddReqBtn) {
+          openAddReqBtn.addEventListener("click", () => {
+            document.getElementById("edit-modal-title").textContent = "\u2795 \u0625\u0636\u0627\u0641\u0629 \u0637\u0644\u0628 \u0635\u064A\u0627\u0646\u0629 \u062C\u062F\u064A\u062F";
+            document.getElementById("edit-req-id").value = "";
+            document.getElementById("edit-req-name").value = "";
+            document.getElementById("edit-req-phone").value = "";
+            document.getElementById("edit-req-appliance").value = "";
+            document.getElementById("edit-req-problem").value = "\u0635\u064A\u0627\u0646\u0629 \u0639\u0627\u0645\u0629";
+            document.getElementById("edit-req-gov").value = "\u0627\u0644\u0642\u0627\u0647\u0631\u0629";
+            document.getElementById("edit-req-page").value = "DASHBOARD";
+            document.getElementById("edit-req-status-select").value = "new";
+            document.getElementById("modal-edit-request").style.display = "flex";
+          });
+        }
+        const editReqForm = document.getElementById("edit-request-form");
+        if (editReqForm) {
+          editReqForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const saveBtn = editReqForm.querySelector("button[type='submit']");
+            const origText = saveBtn ? saveBtn.textContent : "\u062D\u0641\u0638";
+            if (saveBtn) {
+              saveBtn.disabled = true;
+              saveBtn.textContent = "\u062C\u0627\u0631\u064A \u0627\u0644\u062D\u0641\u0638...";
+            }
+            const id = document.getElementById("edit-req-id").value;
+            const payload = {
+              clientName: document.getElementById("edit-req-name").value,
+              clientPhone: document.getElementById("edit-req-phone").value,
+              appliance: document.getElementById("edit-req-appliance").value,
+              problem: document.getElementById("edit-req-problem").value,
+              governorate: document.getElementById("edit-req-gov").value,
+              sourcePage: document.getElementById("edit-req-page").value,
+              status: document.getElementById("edit-req-status-select").value
+            };
+            try {
+              if (id) {
+                await convex.mutation("analytics:editRequest", { id, ...payload });
+              } else {
+                await convex.mutation("analytics:createRequestDashboard", payload);
+              }
+              document.getElementById("modal-edit-request").style.display = "none";
+            } catch (err) {
+              alert("\u062E\u0637\u0623 \u0623\u062B\u0646\u0627\u0621 \u0627\u0644\u062D\u0641\u0638: " + err.message);
+            } finally {
+              if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = origText;
+              }
+            }
+          });
+        }
+        showSection("overview");
+        subscribeAll(activeRange);
+        subscribeRequests();
+        const clerkId = clerk.user.id;
+        const email = (_i = (_h = clerk.user.primaryEmailAddress) == null ? void 0 : _h.emailAddress) != null ? _i : "";
+        try {
+          await convex.mutation("analytics:registerCurrentUser", {
+            name,
+            email,
+            avatarUrl: avatar || void 0
+          });
+        } catch (e) {
+          console.warn("Could not register user in Convex:", e);
+        }
+        subscribeUsers(clerkId);
+        initUsersSection(clerkId);
+        initSystemSettings();
+      } catch (err) {
+        console.log("[Dashboard] Clerk initialization failed:", err.message);
+        const friendlyMsg = err.message === "TIMEOUT" ? "\u0627\u0646\u062A\u0647\u062A \u0645\u0647\u0644\u0629 \u0627\u0644\u0627\u062A\u0635\u0627\u0644 \u0628\u062E\u062F\u0645\u0629 \u0627\u0644\u062A\u062D\u0642\u0642 \u0645\u0646 \u0627\u0644\u0647\u0648\u064A\u0629" : err.message;
+        if (loadingEl) {
+          loadingEl.innerHTML = `
+          <div style="display:flex;flex-direction:column;align-items:center;gap:16px;">
+            <span style="font-size:2.5rem;">\u26A0\uFE0F</span>
+            <p style="color:#ef4444;font-weight:700;font-size:1.1rem;margin:0;">\u062A\u0639\u0630\u0631 \u062A\u062D\u0645\u064A\u0644 \u0644\u0648\u062D\u0629 \u0627\u0644\u062A\u062D\u0643\u0645</p>
+            <p style="color:var(--clr-text-muted);font-size:0.85rem;margin:0;max-width:300px;line-height:1.5;">${friendlyMsg}</p>
+            <button id="btn-retry-init" class="settings-btn-save" style="margin-top:8px;padding:8px 24px;cursor:pointer;font-family:Cairo,sans-serif;font-weight:700;">\u0625\u0639\u0627\u062F\u0629 \u0627\u0644\u0645\u062D\u0627\u0648\u0644\u0629</button>
+          </div>
+        `;
+          (_j = document.getElementById("btn-retry-init")) == null ? void 0 : _j.addEventListener("click", () => {
+            runInit();
+          });
+        }
       }
     }
+    runInit();
   })();
 })();

@@ -25,10 +25,33 @@ const convex = new ConvexClient(CONVEX_URL);
 // ============================================================
 // CLERK AUTH
 // ============================================================
+function withTimeout(promise, ms, errorMsg) {
+  let timeoutId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(errorMsg));
+    }, ms);
+  });
+  return Promise.race([
+    promise.then((res) => {
+      clearTimeout(timeoutId);
+      return res;
+    }),
+    timeoutPromise
+  ]);
+}
+
 async function initClerk() {
+  console.log("[Dashboard] Clerk initialization started");
   const clerk = window.Clerk;
-  if (!clerk) throw new Error("Clerk script not loaded");
+  if (!clerk) {
+    console.log("[Dashboard] Clerk initialization failed: Clerk script not loaded");
+    throw new Error("Clerk script not loaded");
+  }
+  console.log("[Dashboard] Clerk instance created");
+  console.log("[Dashboard] Clerk.load started");
   await clerk.load({ publishableKey: CLERK_KEY });
+  console.log("[Dashboard] Clerk.load completed");
   return clerk;
 }
 
@@ -1464,270 +1487,306 @@ function initSystemSettings() {
 
 
 (async function main() {
-  try {
-    const clerk = await initClerk();
+  console.log("[Dashboard] script started");
+  console.log("[Dashboard] Clerk script available:", !!window.Clerk);
 
-    // If not signed in → show Clerk sign-in UI
-    if (!clerk.user) {
-      document.getElementById("auth-wall").hidden = false;
-      document.getElementById("dashboard-app").hidden = true;
-      clerk.mountSignIn(document.getElementById("clerk-sign-in"), {
-        forceRedirectUrl: "/dashboard/",
-      });
-      return;
+  async function runInit() {
+    const loadingEl = document.getElementById("clerk-loading");
+    if (loadingEl) {
+      loadingEl.style.display = "flex";
+      loadingEl.innerHTML = `
+        <div class="spinner"></div>
+        <p>جاري تحميل لوحة التحكم...</p>
+      `;
     }
 
-    // Set up Convex auth with Clerk JWT
-    convex.setAuth(async () => {
-      try {
-        const token = await clerk.session?.getToken({ template: "convex" });
-        return token ?? null;
-      } catch {
-        return null;
-      }
-    });
-
-    // Show dashboard
-    document.getElementById("auth-wall").hidden = true;
-    document.getElementById("dashboard-app").hidden = false;
-
-    // Populate user info
-    const user = clerk.user;
-    const name = user.fullName ?? user.primaryEmailAddress?.emailAddress ?? "Admin";
-    const avatar = user.imageUrl;
-    const userNameEl = document.getElementById("user-name");
-    const userAvatarEl = document.getElementById("user-avatar");
-    if (userNameEl) userNameEl.textContent = name;
-    if (userAvatarEl && avatar) {
-      userAvatarEl.src = avatar;
-      userAvatarEl.hidden = false;
-    }
-
-    // Sign out
-    document.getElementById("sign-out-btn")?.addEventListener("click", async () => {
-      clearSubs();
-      await clerk.signOut();
-      window.location.reload();
-    });
-
-    // Navigation
-    document.querySelectorAll(".nav-item[data-section]").forEach(item => {
-      item.addEventListener("click", () => showSection(item.dataset.section));
-    });
-
-    // Date range filters (sync both overview & analytics tabs)
-    let activeRange = "7d";
-    const handleRangeChange = (range) => {
-      activeRange = range;
-      document.querySelectorAll("[data-range], [data-anal-range]").forEach(b => {
-        if (b.dataset.range === range || b.dataset.anal-range === range || b.dataset.analRange === range) {
-          b.classList.add("range-active");
-        } else {
-          b.classList.remove("range-active");
-        }
-      });
-      subscribeAll(activeRange);
-    };
-
-    document.querySelectorAll("[data-range]").forEach(btn => {
-      btn.addEventListener("click", () => handleRangeChange(btn.dataset.range));
-    });
-    document.querySelectorAll("[data-anal-range]").forEach(btn => {
-      btn.addEventListener("click", () => handleRangeChange(btn.dataset.analRange || btn.getAttribute("data-anal-range")));
-    });
-
-    // Mobile sidebar toggle with overlay
-    const overlay = document.createElement("div");
-    overlay.id = "sidebar-overlay";
-    overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:199;display:none;backdrop-filter:blur(2px);";
-    document.body.appendChild(overlay);
-
-    const openSidebar = () => {
-      document.getElementById("sidebar")?.classList.add("open");
-      overlay.style.display = "block";
-    };
-    const closeSidebar = () => {
-      document.getElementById("sidebar")?.classList.remove("open");
-      overlay.style.display = "none";
-    };
-
-    document.getElementById("sidebar-toggle")?.addEventListener("click", closeSidebar);
-    document.getElementById("sidebar-toggle-hamburger")?.addEventListener("click", openSidebar);
-    overlay.addEventListener("click", closeSidebar);
-
-    // Link 'show all pages' to pages section
-    document.getElementById("link-show-all-pages")?.addEventListener("click", (e) => {
-      e.preventDefault();
-      showSection("pages");
-    });
-
-    // Bind settings form submission
-    const settingsForm = document.getElementById("settings-form");
-    if (settingsForm) {
-      settingsForm.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const saveBtn = settingsForm.querySelector("button[type='submit']");
-        const origText = saveBtn ? saveBtn.textContent : "حفظ التغييرات";
-        if (saveBtn) {
-          saveBtn.disabled = true;
-          saveBtn.textContent = "جاري الحفظ...";
-        }
-
-        const payload = {
-          whatsappNumber:     document.getElementById("set-whatsapp")?.value || "",
-          hotlineNumber:      document.getElementById("set-hotline")?.value || "",
-          workingHours:       document.getElementById("set-hours")?.value || "",
-          contactEmail:       document.getElementById("set-email")?.value || "",
-          heroTitle:          document.getElementById("set-hero-title")?.value || "",
-          heroSubtitle:       document.getElementById("set-hero-sub")?.value || "",
-          servicesTitle:      document.getElementById("set-services-title")?.value || "",
-          servicesSubtitle:   document.getElementById("set-services-sub")?.value || "",
-          testimonialsTitle:  document.getElementById("set-testimonials-title")?.value || "",
-          whyUsTitle:         document.getElementById("set-why-title")?.value || "",
-          whyUsSubtitle:      document.getElementById("set-why-sub")?.value || "",
-        };
-
-        try {
-          await convex.mutation("analytics:updateSettings", payload);
-          alert("تم حفظ إعدادات الموقع وتحديث الصفحات بنجاح! 🎉");
-        } catch (err) {
-          console.error("Save settings error:", err);
-          alert("خطأ أثناء حفظ التغييرات: " + err.message);
-        } finally {
-          if (saveBtn) {
-            saveBtn.disabled = false;
-            saveBtn.textContent = origText;
-          }
-        }
-      });
-    }
-
-    // Bind Mock Data Generator
-    const mockBtn = document.getElementById("btn-generate-mock");
-    if (mockBtn) {
-      mockBtn.addEventListener("click", async () => {
-        const statusEl = document.getElementById("mock-status");
-        if (!statusEl) return;
-        statusEl.style.display = "block";
-        statusEl.style.background = "#f59e0b";
-        statusEl.style.color = "#1e1b4b";
-        statusEl.textContent = "جاري إنشاء أكثر من 150 حدث إحصائي عشوائي...";
-        try {
-          await convex.mutation("analytics:populateMockData", {});
-          statusEl.style.background = "#10b981";
-          statusEl.style.color = "#fff";
-          statusEl.textContent = "تم توليد البيانات الوهمية للـ 30 يوماً الماضية بنجاح!";
-          setTimeout(() => { statusEl.style.display = "none"; }, 3000);
-        } catch (err) {
-          statusEl.style.background = "#ef4444";
-          statusEl.style.color = "#fff";
-          statusEl.textContent = "خطأ: " + err.message;
-        }
-      });
-    }
-
-    // Bind requests search and filter
-    const reqSearchInput = document.getElementById("requests-search-input");
-    if (reqSearchInput) {
-      reqSearchInput.addEventListener("input", (e) => {
-        _searchQuery = e.target.value.trim();
-        subscribeRequests();
-      });
-    }
-
-    const reqStatusFilter = document.getElementById("requests-status-filter");
-    if (reqStatusFilter) {
-      reqStatusFilter.addEventListener("change", (e) => {
-        _statusFilter = e.target.value;
-        subscribeRequests();
-      });
-    }
-
-    // Bind Open Add Request Modal
-    const openAddReqBtn = document.getElementById("btn-open-add-request");
-    if (openAddReqBtn) {
-      openAddReqBtn.addEventListener("click", () => {
-        document.getElementById("edit-modal-title").textContent = "➕ إضافة طلب صيانة جديد";
-        document.getElementById("edit-req-id").value = "";
-        document.getElementById("edit-req-name").value = "";
-        document.getElementById("edit-req-phone").value = "";
-        document.getElementById("edit-req-appliance").value = "";
-        document.getElementById("edit-req-problem").value = "صيانة عامة";
-        document.getElementById("edit-req-gov").value = "القاهرة";
-        document.getElementById("edit-req-page").value = "DASHBOARD";
-        document.getElementById("edit-req-status-select").value = "new";
-
-        document.getElementById("modal-edit-request").style.display = "flex";
-      });
-    }
-
-    // Bind Edit/Add Request form submission
-    const editReqForm = document.getElementById("edit-request-form");
-    if (editReqForm) {
-      editReqForm.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const saveBtn = editReqForm.querySelector("button[type='submit']");
-        const origText = saveBtn ? saveBtn.textContent : "حفظ";
-        if (saveBtn) {
-          saveBtn.disabled = true;
-          saveBtn.textContent = "جاري الحفظ...";
-        }
-
-        const id = document.getElementById("edit-req-id").value;
-        const payload = {
-          clientName:   document.getElementById("edit-req-name").value,
-          clientPhone:  document.getElementById("edit-req-phone").value,
-          appliance:    document.getElementById("edit-req-appliance").value,
-          problem:      document.getElementById("edit-req-problem").value,
-          governorate:  document.getElementById("edit-req-gov").value,
-          sourcePage:   document.getElementById("edit-req-page").value,
-          status:       document.getElementById("edit-req-status-select").value,
-        };
-
-        try {
-          if (id) {
-            await convex.mutation("analytics:editRequest", { id, ...payload });
-          } else {
-            await convex.mutation("analytics:createRequestDashboard", payload);
-          }
-          document.getElementById("modal-edit-request").style.display = "none";
-        } catch (err) {
-          alert("خطأ أثناء الحفظ: " + err.message);
-        } finally {
-          if (saveBtn) {
-            saveBtn.disabled = false;
-            saveBtn.textContent = origText;
-          }
-        }
-      });
-    }
-
-    // Start
-    showSection("overview");
-    subscribeAll(activeRange);
-    subscribeRequests();
-
-    // Register / update current user in Convex DB + subscribe users
-    const clerkId = clerk.user.id;
-    const email = clerk.user.primaryEmailAddress?.emailAddress ?? "";
     try {
-      await convex.mutation("analytics:registerCurrentUser", {
-        name,
-        email,
-        avatarUrl: avatar || undefined,
+      const clerk = await withTimeout(initClerk(), 10000, "TIMEOUT");
+      console.log("[Dashboard] Clerk initialized");
+      console.log("[Dashboard] session state:", clerk.session ? "Active" : "None");
+      console.log("[Dashboard] user state:", clerk.user ? clerk.user.id : "Signed out");
+
+      // If not signed in → show Clerk sign-in UI
+      if (!clerk.user) {
+        console.log("[Dashboard] rendering sign-in");
+        
+        const cardEl = document.getElementById("auth-card");
+        if (loadingEl) loadingEl.style.display = "none";
+        if (cardEl) cardEl.style.display = "block";
+
+        document.getElementById("auth-wall").hidden = false;
+        document.getElementById("dashboard-app").hidden = true;
+        clerk.mountSignIn(document.getElementById("clerk-sign-in"), {
+          forceRedirectUrl: "/dashboard/",
+        });
+        return;
+      }
+
+      console.log("[Dashboard] rendering dashboard");
+      document.getElementById("auth-wall").hidden = true;
+      document.getElementById("dashboard-app").hidden = false;
+
+      // Set up Convex auth with Clerk JWT
+      convex.setAuth(async () => {
+        try {
+          const token = await clerk.session?.getToken({ template: "convex" });
+          return token ?? null;
+        } catch {
+          return null;
+        }
       });
-    } catch(e) {
-      console.warn("Could not register user in Convex:", e);
-    }
-    subscribeUsers(clerkId);
-    initUsersSection(clerkId);
-    initSystemSettings();
-  } catch (err) {
-    console.error("Dashboard init error:", err);
-    const bootErr = document.getElementById("boot-error");
-    if (bootErr) {
-      bootErr.textContent = "خطأ في تهيئة لوحة التحكم: " + err.message;
-      bootErr.style.display = "block";
+
+      // Populate user info
+      const user = clerk.user;
+      const name = user.fullName ?? user.primaryEmailAddress?.emailAddress ?? "Admin";
+      const avatar = user.imageUrl;
+      const userNameEl = document.getElementById("user-name");
+      const userAvatarEl = document.getElementById("user-avatar");
+      if (userNameEl) userNameEl.textContent = name;
+      if (userAvatarEl && avatar) {
+        userAvatarEl.src = avatar;
+        userAvatarEl.hidden = false;
+      }
+
+      // Sign out
+      document.getElementById("sign-out-btn")?.addEventListener("click", async () => {
+        clearSubs();
+        await clerk.signOut();
+        window.location.reload();
+      });
+
+      // Navigation
+      document.querySelectorAll(".nav-item[data-section]").forEach(item => {
+        item.addEventListener("click", () => showSection(item.dataset.section));
+      });
+
+      // Date range filters (sync both overview & analytics tabs)
+      let activeRange = "7d";
+      const handleRangeChange = (range) => {
+        activeRange = range;
+        document.querySelectorAll("[data-range], [data-anal-range]").forEach(b => {
+          if (b.dataset.range === range || b.dataset.anal_range === range || b.dataset.analRange === range) {
+            b.classList.add("range-active");
+          } else {
+            b.classList.remove("range-active");
+          }
+        });
+        subscribeAll(activeRange);
+      };
+
+      document.querySelectorAll("[data-range]").forEach(btn => {
+        btn.addEventListener("click", () => handleRangeChange(btn.dataset.range));
+      });
+      document.querySelectorAll("[data-anal-range]").forEach(btn => {
+        btn.addEventListener("click", () => handleRangeChange(btn.dataset.analRange || btn.getAttribute("data-anal-range")));
+      });
+
+      // Mobile sidebar toggle with overlay
+      const overlay = document.getElementById("sidebar-overlay") || document.createElement("div");
+      if (!overlay.id) {
+        overlay.id = "sidebar-overlay";
+        overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:199;display:none;backdrop-filter:blur(2px);";
+        document.body.appendChild(overlay);
+      }
+
+      const openSidebar = () => {
+        document.getElementById("sidebar")?.classList.add("open");
+        overlay.style.display = "block";
+      };
+      const closeSidebar = () => {
+        document.getElementById("sidebar")?.classList.remove("open");
+        overlay.style.display = "none";
+      };
+
+      document.getElementById("sidebar-toggle")?.addEventListener("click", closeSidebar);
+      document.getElementById("sidebar-toggle-hamburger")?.addEventListener("click", openSidebar);
+      overlay.addEventListener("click", closeSidebar);
+
+      // Link 'show all pages' to pages section
+      document.getElementById("link-show-all-pages")?.addEventListener("click", (e) => {
+        e.preventDefault();
+        showSection("pages");
+      });
+
+      // Bind settings form submission
+      const settingsForm = document.getElementById("settings-form");
+      if (settingsForm) {
+        settingsForm.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const saveBtn = settingsForm.querySelector("button[type='submit']");
+          const origText = saveBtn ? saveBtn.textContent : "حفظ التغييرات";
+          if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.textContent = "جاري الحفظ...";
+          }
+
+          const payload = {
+            whatsappNumber:     document.getElementById("set-whatsapp")?.value || "",
+            hotlineNumber:      document.getElementById("set-hotline")?.value || "",
+            workingHours:       document.getElementById("set-hours")?.value || "",
+            contactEmail:       document.getElementById("set-email")?.value || "",
+            heroTitle:          document.getElementById("set-hero-title")?.value || "",
+            heroSubtitle:       document.getElementById("set-hero-sub")?.value || "",
+            servicesTitle:      document.getElementById("set-services-title")?.value || "",
+            servicesSubtitle:   document.getElementById("set-services-sub")?.value || "",
+            testimonialsTitle:  document.getElementById("set-testimonials-title")?.value || "",
+            whyUsTitle:         document.getElementById("set-why-title")?.value || "",
+            whyUsSubtitle:      document.getElementById("set-why-sub")?.value || "",
+          };
+
+          try {
+            await convex.mutation("analytics:updateSettings", payload);
+            alert("تم حفظ إعدادات الموقع وتحديث الصفحات بنجاح! 🎉");
+          } catch (err) {
+            console.error("Save settings error:", err);
+            alert("خطأ أثناء حفظ التغييرات: " + err.message);
+          } finally {
+            if (saveBtn) {
+              saveBtn.disabled = false;
+              saveBtn.textContent = origText;
+            }
+          }
+        });
+      }
+
+      // Bind Mock Data Generator
+      const mockBtn = document.getElementById("btn-generate-mock");
+      if (mockBtn) {
+        mockBtn.addEventListener("click", async () => {
+          const statusEl = document.getElementById("mock-status");
+          if (!statusEl) return;
+          statusEl.style.display = "block";
+          statusEl.style.background = "#f59e0b";
+          statusEl.style.color = "#1e1b4b";
+          statusEl.textContent = "جاري إنشاء أكثر من 150 حدث إحصائي عشوائي...";
+          try {
+            await convex.mutation("analytics:populateMockData", {});
+            statusEl.style.background = "#10b981";
+            statusEl.style.color = "#fff";
+            statusEl.textContent = "تم توليد البيانات الوهمية للـ 30 يوماً الماضية بنجاح!";
+            setTimeout(() => { statusEl.style.display = "none"; }, 3000);
+          } catch (err) {
+            statusEl.style.background = "#ef4444";
+            statusEl.style.color = "#fff";
+            statusEl.textContent = "خطأ: " + err.message;
+          }
+        });
+      }
+
+      // Bind requests search and filter
+      const reqSearchInput = document.getElementById("requests-search-input");
+      if (reqSearchInput) {
+        reqSearchInput.addEventListener("input", (e) => {
+          _searchQuery = e.target.value.trim();
+          subscribeRequests();
+        });
+      }
+
+      const reqStatusFilter = document.getElementById("requests-status-filter");
+      if (reqStatusFilter) {
+        reqStatusFilter.addEventListener("change", (e) => {
+          _statusFilter = e.target.value;
+          subscribeRequests();
+        });
+      }
+
+      // Bind Open Add Request Modal
+      const openAddReqBtn = document.getElementById("btn-open-add-request");
+      if (openAddReqBtn) {
+        openAddReqBtn.addEventListener("click", () => {
+          document.getElementById("edit-modal-title").textContent = "➕ إضافة طلب صيانة جديد";
+          document.getElementById("edit-req-id").value = "";
+          document.getElementById("edit-req-name").value = "";
+          document.getElementById("edit-req-phone").value = "";
+          document.getElementById("edit-req-appliance").value = "";
+          document.getElementById("edit-req-problem").value = "صيانة عامة";
+          document.getElementById("edit-req-gov").value = "القاهرة";
+          document.getElementById("edit-req-page").value = "DASHBOARD";
+          document.getElementById("edit-req-status-select").value = "new";
+
+          document.getElementById("modal-edit-request").style.display = "flex";
+        });
+      }
+
+      // Bind Edit/Add Request form submission
+      const editReqForm = document.getElementById("edit-request-form");
+      if (editReqForm) {
+        editReqForm.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const saveBtn = editReqForm.querySelector("button[type='submit']");
+          const origText = saveBtn ? saveBtn.textContent : "حفظ";
+          if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.textContent = "جاري الحفظ...";
+          }
+
+          const id = document.getElementById("edit-req-id").value;
+          const payload = {
+            clientName:   document.getElementById("edit-req-name").value,
+            clientPhone:  document.getElementById("edit-req-phone").value,
+            appliance:    document.getElementById("edit-req-appliance").value,
+            problem:      document.getElementById("edit-req-problem").value,
+            governorate:  document.getElementById("edit-req-gov").value,
+            sourcePage:   document.getElementById("edit-req-page").value,
+            status:       document.getElementById("edit-req-status-select").value,
+          };
+
+          try {
+            if (id) {
+              await convex.mutation("analytics:editRequest", { id, ...payload });
+            } else {
+              await convex.mutation("analytics:createRequestDashboard", payload);
+            }
+            document.getElementById("modal-edit-request").style.display = "none";
+          } catch (err) {
+            alert("خطأ أثناء الحفظ: " + err.message);
+          } finally {
+            if (saveBtn) {
+              saveBtn.disabled = false;
+              saveBtn.textContent = origText;
+            }
+          }
+        });
+      }
+
+      // Start
+      showSection("overview");
+      subscribeAll(activeRange);
+      subscribeRequests();
+
+      // Register / update current user in Convex DB + subscribe users
+      const clerkId = clerk.user.id;
+      const email = clerk.user.primaryEmailAddress?.emailAddress ?? "";
+      try {
+        await convex.mutation("analytics:registerCurrentUser", {
+          name,
+          email,
+          avatarUrl: avatar || undefined,
+        });
+      } catch(e) {
+        console.warn("Could not register user in Convex:", e);
+      }
+      subscribeUsers(clerkId);
+      initUsersSection(clerkId);
+      initSystemSettings();
+    } catch (err) {
+      console.log("[Dashboard] Clerk initialization failed:", err.message);
+      const friendlyMsg = err.message === "TIMEOUT" ? "انتهت مهلة الاتصال بخدمة التحقق من الهوية" : err.message;
+      if (loadingEl) {
+        loadingEl.innerHTML = `
+          <div style="display:flex;flex-direction:column;align-items:center;gap:16px;">
+            <span style="font-size:2.5rem;">⚠️</span>
+            <p style="color:#ef4444;font-weight:700;font-size:1.1rem;margin:0;">تعذر تحميل لوحة التحكم</p>
+            <p style="color:var(--clr-text-muted);font-size:0.85rem;margin:0;max-width:300px;line-height:1.5;">${friendlyMsg}</p>
+            <button id="btn-retry-init" class="settings-btn-save" style="margin-top:8px;padding:8px 24px;cursor:pointer;font-family:Cairo,sans-serif;font-weight:700;">إعادة المحاولة</button>
+          </div>
+        `;
+        document.getElementById("btn-retry-init")?.addEventListener("click", () => {
+          runInit();
+        });
+      }
     }
   }
+
+  runInit();
 })();

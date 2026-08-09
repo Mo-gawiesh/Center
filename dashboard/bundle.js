@@ -5067,26 +5067,39 @@ var HCDashboard = (() => {
     const lastActive = u.lastActiveAt ? timeAgo(u.lastActiveAt) : ((_a2 = u.clerkId) == null ? void 0 : _a2.startsWith("pending_")) ? "\u0644\u0645 \u064A\u0633\u062C\u0644 \u0628\u0639\u062F" : "\u2014";
     const avatarInitial = (u.name || "?").charAt(0).toUpperCase();
     const canManage = (_myPerms == null ? void 0 : _myPerms.role) === "owner";
-    const actionMenu = canManage ? `
-    <div class="user-action-wrap" style="position:relative;display:inline-block;">
-      <button class="icon-btn" onclick="toggleUserMenu('${u._id}')" style="padding:4px 8px;border-radius:6px;">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:16px;height:16px;">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM12.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM18.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
-        </svg>
-      </button>
-      <div id="user-menu-${u._id}" style="display:none;position:absolute;left:0;top:110%;background:var(--clr-surface-2);border:1px solid var(--clr-border);border-radius:10px;min-width:160px;z-index:100;box-shadow:0 4px 24px rgba(0,0,0,.3);overflow:hidden;">
-        <button onclick="handleChangeRole('${u._id}', '${u.role}')" style="width:100%;text-align:right;padding:0.6rem 1rem;background:none;border:none;color:var(--clr-text);font-family:Cairo,sans-serif;font-size:0.82rem;cursor:pointer;display:flex;align-items:center;gap:6px;" onmouseover="this.style.background='rgba(59,130,246,0.1)'" onmouseout="this.style.background='none'">
-          \u270F\uFE0F \u062A\u063A\u064A\u064A\u0631 \u0627\u0644\u062F\u0648\u0631
+    let roleHtml = "";
+    if (canManage && !isCurrentUser) {
+      roleHtml = `
+      <select onchange="window.handleChangeRoleDirect('${u._id}', this.value)" style="background:var(--clr-surface-2);color:${meta.color};border:1px solid var(--clr-border);border-radius:20px;padding:3px 10px;font-family:Cairo,sans-serif;font-size:0.78rem;font-weight:700;cursor:pointer;outline:none;text-align:center;">
+        <option value="owner" ${u.role === "owner" ? "selected" : ""} style="color:#d946ef;background:var(--clr-surface-2);">\u{1F451} \u0627\u0644\u0645\u0627\u0644\u0643</option>
+        <option value="admin" ${u.role === "admin" ? "selected" : ""} style="color:#ef4444;background:var(--clr-surface-2);">\u{1F6E1}\uFE0F \u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645</option>
+        <option value="editor" ${u.role === "editor" ? "selected" : ""} style="color:#3b82f6;background:var(--clr-surface-2);">\u270F\uFE0F \u0645\u062D\u0631\u0631</option>
+        <option value="media_buyer" ${u.role === "media_buyer" ? "selected" : ""} style="color:#f59e0b;background:var(--clr-surface-2);">\u{1F4CA} \u0645\u064A\u062F\u064A\u0627 \u0628\u0627\u064A\u0631</option>
+        <option value="viewer" ${u.role === "viewer" ? "selected" : ""} style="color:#10b981;background:var(--clr-surface-2);">\u{1F441}\uFE0F \u0645\u0634\u0627\u0647\u062F</option>
+      </select>
+    `;
+    } else {
+      roleHtml = `
+      <span style="display:inline-flex;align-items:center;gap:5px;background:${meta.color}18;color:${meta.color};padding:3px 10px;border-radius:20px;font-size:0.78rem;font-weight:700;">
+        ${meta.icon} ${meta.label}
+      </span>
+    `;
+    }
+    let actionHtml = "";
+    if (canManage && !isCurrentUser) {
+      actionHtml = `
+      <div style="display:flex;gap:8px;">
+        <button onclick="window.handleToggleStatus('${u._id}')" title="${u.status === "active" ? "\u062A\u0639\u0644\u064A\u0642 \u0627\u0644\u062D\u0633\u0627\u0628" : "\u062A\u0641\u0639\u064A\u0644 \u0627\u0644\u062D\u0633\u0627\u0628"}" style="padding:4px 8px;border-radius:6px;background:rgba(245,158,11,0.1);color:#f59e0b;cursor:pointer;font-size:0.85rem;" onmouseover="this.style.background='rgba(245,158,11,0.2)'" onmouseout="this.style.background='rgba(245,158,11,0.1)'">
+          ${u.status === "active" ? "\u{1F6AB}" : "\u2705"}
         </button>
-        ${!isCurrentUser ? `
-        <button onclick="handleToggleStatus('${u._id}')" style="width:100%;text-align:right;padding:0.6rem 1rem;background:none;border:none;color:${u.status === "active" ? "#f59e0b" : "#10b981"};font-family:Cairo,sans-serif;font-size:0.82rem;cursor:pointer;display:flex;align-items:center;gap:6px;" onmouseover="this.style.background='rgba(245,158,11,0.1)'" onmouseout="this.style.background='none'">
-          ${u.status === "active" ? "\u2297 \u062A\u0639\u0644\u064A\u0642 \u0627\u0644\u062D\u0633\u0627\u0628" : "\u2713 \u062A\u0641\u0639\u064A\u0644 \u0627\u0644\u062D\u0633\u0627\u0628"}
+        <button onclick="window.handleDeleteUser('${u._id}', '${u.name}')" title="\u062D\u0630\u0641 \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645" style="padding:4px 8px;border-radius:6px;background:rgba(239,68,68,0.1);color:#ef4444;cursor:pointer;font-size:0.85rem;" onmouseover="this.style.background='rgba(239,68,68,0.2)'" onmouseout="this.style.background='rgba(239,68,68,0.1)'">
+          \u{1F5D1}\uFE0F
         </button>
-        <button onclick="handleDeleteUser('${u._id}', '${u.name}')" style="width:100%;text-align:right;padding:0.6rem 1rem;background:none;border:none;color:#ef4444;font-family:Cairo,sans-serif;font-size:0.82rem;cursor:pointer;display:flex;align-items:center;gap:6px;" onmouseover="this.style.background='rgba(239,68,68,0.1)'" onmouseout="this.style.background='none'">
-          \u{1F5D1}\uFE0F \u062D\u0630\u0641 \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645
-        </button>` : ""}
       </div>
-    </div>` : `<span style="color:var(--clr-text-faint);font-size:0.78rem;">\u2014</span>`;
+    `;
+    } else {
+      actionHtml = `<span style="color:var(--clr-text-faint);font-size:0.78rem;">\u2014</span>`;
+    }
     return `
     <tr id="user-row-${u._id}" style="${u.status === "suspended" ? "opacity:0.55;" : ""}">
       <td>
@@ -5098,30 +5111,25 @@ var HCDashboard = (() => {
         </div>
       </td>
       <td style="color:var(--clr-text-muted);font-size:0.83rem;direction:ltr;text-align:right;">${u.email}</td>
-      <td>
-        <span style="display:inline-flex;align-items:center;gap:5px;background:${meta.color}18;color:${meta.color};padding:3px 10px;border-radius:20px;font-size:0.78rem;font-weight:700;">
-          ${meta.icon} ${meta.label}
-        </span>
-      </td>
+      <td>${roleHtml}</td>
       <td>${statusBadge}</td>
       <td style="color:var(--clr-text-muted);font-size:0.82rem;">${lastActive}</td>
-      <td>${actionMenu}</td>
+      <td>${actionHtml}</td>
     </tr>`;
   }
-  window.toggleUserMenu = function(id) {
-    document.querySelectorAll("[id^='user-menu-']").forEach((m) => {
-      if (m.id !== `user-menu-${id}`) m.style.display = "none";
-    });
-    const menu = document.getElementById(`user-menu-${id}`);
-    if (menu) menu.style.display = menu.style.display === "none" ? "block" : "none";
-  };
-  document.addEventListener("click", (e) => {
-    if (!e.target.closest(".user-action-wrap")) {
-      document.querySelectorAll("[id^='user-menu-']").forEach((m) => m.style.display = "none");
+  window.handleChangeRoleDirect = async function(userId, newRole) {
+    const validRoles = ["owner", "admin", "editor", "media_buyer", "viewer"];
+    if (!validRoles.includes(newRole)) {
+      alert("\u062F\u0648\u0631 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D");
+      return;
     }
-  });
+    try {
+      await convex.mutation("analytics:updateUserRole", { userId, role: newRole });
+    } catch (err) {
+      alert("\u062E\u0637\u0623: " + err.message);
+    }
+  };
   window.handleChangeRole = async function(userId, currentRole) {
-    document.querySelectorAll("[id^='user-menu-']").forEach((m) => m.style.display = "none");
     const chosen = prompt(`\u0627\u062E\u062A\u0631 \u0627\u0644\u062F\u0648\u0631 \u0627\u0644\u062C\u062F\u064A\u062F:
 owner \u2014 \u0627\u0644\u0645\u0627\u0644\u0643
 admin \u2014 \u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645
@@ -5131,16 +5139,7 @@ viewer \u2014 \u0645\u0634\u0627\u0647\u062F
 
 \u0623\u062F\u062E\u0644 \u0627\u0644\u0643\u0648\u062F:`);
     if (!chosen) return;
-    const validRoles = ["owner", "admin", "editor", "media_buyer", "viewer"];
-    if (!validRoles.includes(chosen.trim())) {
-      alert("\u062F\u0648\u0631 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D");
-      return;
-    }
-    try {
-      await convex.mutation("analytics:updateUserRole", { userId, role: chosen.trim() });
-    } catch (err) {
-      alert("\u062E\u0637\u0623: " + err.message);
-    }
+    window.handleChangeRoleDirect(userId, chosen.trim());
   };
   window.handleToggleStatus = async function(userId) {
     document.querySelectorAll("[id^='user-menu-']").forEach((m) => m.style.display = "none");

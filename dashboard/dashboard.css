@@ -1972,6 +1972,11 @@ body.theme-glass .dash-sidebar {
   box-shadow: 0 12px 35px rgba(16,185,129,0.15), inset 0 1px 1px rgba(255,255,255,0.05) !important;
 }
 
+/* Hide Clerk prebuilt Sign Up footer action completely */
+.cl-footerAction {
+  display: none !important;
+}
+
 
 
 

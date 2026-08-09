@@ -5500,7 +5500,12 @@ viewer \u2014 \u0645\u0634\u0627\u0647\u062F
           document.getElementById("auth-wall").hidden = false;
           document.getElementById("dashboard-app").hidden = true;
           clerk.mountSignIn(document.getElementById("clerk-sign-in"), {
-            forceRedirectUrl: "/dashboard/"
+            forceRedirectUrl: "/dashboard/",
+            appearance: {
+              elements: {
+                footerAction: { display: "none" }
+              }
+            }
           });
           return;
         }

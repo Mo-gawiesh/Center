@@ -1526,6 +1526,11 @@ function initSystemSettings() {
         document.getElementById("dashboard-app").hidden = true;
         clerk.mountSignIn(document.getElementById("clerk-sign-in"), {
           forceRedirectUrl: "/dashboard/",
+          appearance: {
+            elements: {
+              footerAction: { display: "none" }
+            }
+          }
         });
         return;
       }

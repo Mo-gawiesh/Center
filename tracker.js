@@ -24,7 +24,7 @@
      ------------------------------------------------------------------ */
   const CONVEX_URL =
     (typeof window !== "undefined" && window.TRACKER_CONVEX_URL) ||
-    "https://content-ferret-352.eu-west-1.convex.site"; // e.g. https://happy-animal-123.convex.site
+    "https://loyal-starfish-330.eu-west-1.convex.site"; // e.g. https://happy-animal-123.convex.site
 
   const ENDPOINT = CONVEX_URL.replace(/\/$/, "") + "/track";
 

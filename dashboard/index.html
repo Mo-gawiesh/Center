@@ -1,0 +1,1441 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <script>
+    if (location.pathname.endsWith('/dashboard')) {
+      location.replace(location.pathname + '/');
+    }
+    window.openSysModal = function(name) {
+      console.log("Calling stub openSysModal for", name);
+      const modal = document.getElementById("modal-sys-" + name);
+      if (modal) modal.style.display = "flex";
+    };
+    window.closeSysModal = function(name) {
+      console.log("Calling stub closeSysModal for", name);
+      const modal = document.getElementById("modal-sys-" + name);
+      if (modal) modal.style.display = "none";
+    };
+    window.addEventListener('error', function(e) {
+      var div = document.createElement('div');
+      div.style.position = 'fixed'; div.style.top = '10px'; div.style.left = '10px';
+      div.style.background = '#ef4444'; div.style.color = '#fff'; div.style.padding = '15px';
+      div.style.borderRadius = '8px'; div.style.zIndex = '99999'; div.style.fontFamily = 'monospace';
+      div.style.fontSize = '12px'; div.style.maxWidth = '90%'; div.style.whiteSpace = 'pre-wrap';
+      div.textContent = 'Error: ' + e.message + '\nAt: ' + e.filename + ':' + e.lineno;
+      document.documentElement.appendChild(div);
+    });
+    window.addEventListener('unhandledrejection', function(e) {
+      var div = document.createElement('div');
+      div.style.position = 'fixed'; div.style.top = '10px'; div.style.left = '10px';
+      div.style.background = '#ef4444'; div.style.color = '#fff'; div.style.padding = '15px';
+      div.style.borderRadius = '8px'; div.style.zIndex = '99999'; div.style.fontFamily = 'monospace';
+      div.style.fontSize = '12px'; div.style.maxWidth = '90%'; div.style.whiteSpace = 'pre-wrap';
+      div.textContent = 'Unhandled Rejection: ' + (e.reason ? (e.reason.message || e.reason) : e);
+      document.documentElement.appendChild(div);
+    });
+  </script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>لوحة التحكم — الهندسية للتوكيلات</title>
+  <meta name="robots" content="noindex, nofollow" />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="/assets/Logo/logo.png" />
+
+  <!-- Dashboard Styles -->
+  <link rel="stylesheet" href="/dashboard/dashboard.css?v=2.0.0" />
+
+  <!-- Clerk CDN -->
+  <script
+    crossorigin="anonymous"
+    data-clerk-publishable-key="pk_live_Y2xlcmsuZWxoYW5kYXNpYS0xNjQ4MS5jb20k"
+    src="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
+    type="text/javascript"
+  ></script>
+
+  <script>
+    window.__CONVEX_URL__ = "https://content-ferret-352.eu-west-1.convex.cloud";
+    window.__CLERK_KEY__  = "pk_live_Y2xlcmsuZWxoYW5kYXNpYS0xNjQ4MS5jb20k";
+  </script>
+</head>
+<body>
+
+  <!-- Boot error (shown if config is missing) -->
+  <div id="boot-error" style="display:none;padding:2rem;color:#ef4444;font-family:Cairo,sans-serif;text-align:center;font-size:1.1rem;direction:rtl;">
+    ⚠️ تعذّر تحميل لوحة التحكم. تأكد من إعداد CONVEX_URL و CLERK_KEY في ملف dashboard/index.html
+  </div>
+
+  <!-- ============================================================
+       AUTH WALL — Clerk Sign In
+       ============================================================ -->
+  <div id="auth-wall" class="auth-wall">
+    <!-- Loading indicator -->
+    <div id="clerk-loading" class="clerk-loading">
+      <div class="spinner"></div>
+      <p>جاري تحميل لوحة التحكم...</p>
+    </div>
+
+    <!-- Sign In Card (hidden during loading) -->
+    <div id="auth-card" class="auth-card" style="display: none;">
+      <div class="auth-logo">
+        <img src="/assets/Logo/logo.png" alt="الهندسية للتوكيلات" />
+      </div>
+      <h1 class="auth-title">لوحة التحكم</h1>
+      <p class="auth-sub">يرجى تسجيل الدخول للمتابعة</p>
+      <div id="clerk-sign-in" class="clerk-sign-in-wrap"></div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       DASHBOARD APP (hidden until authenticated)
+       ============================================================ -->
+  <div id="dashboard-app" hidden>
+    
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="sidebar" role="navigation" aria-label="القائمة الرئيسية">
+      <div class="sidebar-header">
+        <img src="/assets/Logo/logo.png" alt="الهندسية" class="sidebar-logo" />
+        <div style="display: flex; flex-direction: column;">
+          <span class="sidebar-brand">الهندسية للتوكيلات</span>
+          <span class="sidebar-badge">نظام إدارة الصيانة</span>
+        </div>
+        <button id="sidebar-toggle" class="sidebar-close-btn" aria-label="إغلاق القائمة">✖</button>
+      </div>
+
+      <nav class="sidebar-nav">
+        <!-- الرئيسية -->
+        <div class="nav-category">الرئيسية</div>
+        <button class="nav-item active" data-section="overview">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label">لوحة التحكم</span>
+        </button>
+        <button class="nav-item" data-section="analytics">
+          <span class="nav-icon">📈</span>
+          <span class="nav-label">الإحصائيات</span>
+        </button>
+
+        <!-- إدارة الموقع -->
+        <div class="nav-category">إدارة الموقع</div>
+        <button class="nav-item" data-section="requests">
+          <span class="nav-icon">🔧</span>
+          <span class="nav-label">طلبات الصيانة</span>
+        </button>
+        <button class="nav-item" data-section="pages">
+          <span class="nav-icon">📄</span>
+          <span class="nav-label">صفحات الخدمات</span>
+        </button>
+        <button class="nav-item" data-section="settings">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-label">إعدادات الموقع</span>
+        </button>
+
+        <!-- النظام -->
+        <div class="nav-category">النظام</div>
+        <button class="nav-item" data-section="events">
+          <span class="nav-icon">⚡</span>
+          <span class="nav-label">سجل النشاطات</span>
+        </button>
+        <button class="nav-item" data-section="users">
+          <span class="nav-icon">👥</span>
+          <span class="nav-label">المستخدمون</span>
+        </button>
+        <button class="nav-item" data-section="system-settings">
+          <span class="nav-icon">🛠️</span>
+          <span class="nav-label">الإعدادات</span>
+        </button>
+
+        <div class="nav-divider"></div>
+        <a href="/" class="nav-item nav-external" target="_blank">
+          <span class="nav-icon">🌐</span>
+          <span class="nav-label">عرض الموقع</span>
+          <span class="nav-badge-ext">↗</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-info">
+          <div class="topbar-user-avatar" style="width: 32px; height: 32px; border-width: 1.5px;">م</div>
+          <div style="display: flex; flex-direction: column; min-width: 0;">
+            <span id="user-name" class="user-name" style="font-weight: 700;">مدير النظام</span>
+            <span style="font-size: 0.65rem; color: var(--clr-text-faint); font-weight: 600;">Administrator</span>
+          </div>
+        </div>
+        <button id="sign-out-btn" class="sign-out-btn" aria-label="تسجيل الخروج">
+          خروج
+        </button>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="dash-main" role="main">
+      <!-- Top bar -->
+      <header class="dash-topbar">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <button id="sidebar-toggle-hamburger" class="hamburger-btn" style="display: block;" aria-label="فتح القائمة">☰</button>
+          <div class="topbar-right">
+            <div class="topbar-breadcrumbs">الرئيسية > لوحة التحكم</div>
+            <h1 class="topbar-title">لوحة التحكم</h1>
+          </div>
+        </div>
+        <div class="topbar-status">
+          <span class="pulse-dot"></span>
+          <span>النظام يعمل بشكل طبيعي</span>
+        </div>
+        <div class="topbar-left">
+          <div class="topbar-search">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.637 10.636Z" />
+            </svg>
+            <input type="text" placeholder="بحث..." />
+          </div>
+          <button class="topbar-btn" aria-label="التنبيهات">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="16" height="16">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+            </svg>
+            <span class="badge-dot"></span>
+          </button>
+          <div class="topbar-user-avatar">م</div>
+        </div>
+      </header>
+
+      <!-- ======================================================
+           SECTION: OVERVIEW
+           ====================================================== -->
+      <section id="section-overview" class="dash-section">
+        <!-- Date Range Filter -->
+        <div class="date-filter" role="group" aria-label="فلتر التاريخ">
+          <button data-range="today"     class="range-btn">اليوم</button>
+          <button data-range="yesterday" class="range-btn">أمس</button>
+          <button data-range="7d"        class="range-btn">آخر 7 أيام</button>
+          <button data-range="30d"       class="range-btn range-active">آخر 30 يوم</button>
+          <button data-range="month"     class="range-btn">هذا الشهر</button>
+          <button data-range="all"       class="range-btn">كل الوقت</button>
+        </div>
+
+        <!-- KPI Cards Grid -->
+        <div class="kpi-grid">
+          <!-- Card 1: Visitors -->
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <span class="kpi-badge kpi-up">▲ 12.4%</span>
+              <span class="kpi-icon-wrap">👥</span>
+            </div>
+            <div class="kpi-label">الزوار</div>
+            <div class="kpi-value" id="kpi-visitors">0</div>
+            <div class="kpi-subtext">+12.4% مقارنة بالفترة السابقة</div>
+          </div>
+          <!-- Card 2: Page Views -->
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <span class="kpi-badge kpi-info" id="kpi-pageviews-badge">1.58 ز/ص</span>
+              <span class="kpi-icon-wrap">👁️</span>
+            </div>
+            <div class="kpi-label">مشاهدات الصفحات</div>
+            <div class="kpi-value" id="kpi-pageviews">0</div>
+            <div class="kpi-subtext" id="kpi-pageviews-ratio">1.58 مشاهدة لكل زائر</div>
+          </div>
+          <!-- Card 3: WhatsApp Clicks -->
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <span class="kpi-badge kpi-up" id="kpi-whatsapp-ratio" style="direction: ltr;">10.3%</span>
+              <span class="kpi-icon-wrap" style="color:#10b981;">💬</span>
+            </div>
+            <div class="kpi-label">نقرات واتساب</div>
+            <div class="kpi-value" id="kpi-whatsapp">0</div>
+            <div class="kpi-subtext" id="kpi-whatsapp-sub">10.3% من إجمالي الزوار</div>
+          </div>
+          <!-- Card 4: Hotline Clicks -->
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <span class="kpi-badge kpi-info" id="kpi-hotline-ratio" style="direction: ltr;">3.5%</span>
+              <span class="kpi-icon-wrap" style="color:#f59e0b;">📞</span>
+            </div>
+            <div class="kpi-label">نقرات الخط الساخن</div>
+            <div class="kpi-value" id="kpi-hotline">0</div>
+            <div class="kpi-subtext" id="kpi-hotline-sub">3.5% من إجمالي الزوار</div>
+          </div>
+          <!-- Card 5: Maintenance Requests -->
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <span class="kpi-badge kpi-up">▲ 8.7%</span>
+              <span class="kpi-icon-wrap">🔧</span>
+            </div>
+            <div class="kpi-label">طلبات الصيانة</div>
+            <div class="kpi-value" id="kpi-forms">0</div>
+            <div class="kpi-subtext">+8.7% مقارنة بالفترة السابقة</div>
+          </div>
+          <!-- Card 6: Conversion Rate -->
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <span class="kpi-badge kpi-info" id="kpi-conversion-badge">13.8% ▲</span>
+              <span class="kpi-icon-wrap">🔄</span>
+            </div>
+            <div class="kpi-label">معدل التحويل</div>
+            <div class="kpi-value" id="kpi-conversion">0%</div>
+            <div class="kpi-subtext">زائر - تفاعل</div>
+          </div>
+        </div>
+
+        <!-- Overview Row 1: Line Chart & Funnel -->
+        <div class="overview-row">
+          <!-- Line Chart -->
+          <div class="settings-card" style="display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+              <div>
+                <h2 style="font-size: 1rem; font-weight: 800;">نشاط الموقع</h2>
+                <p style="font-size: 0.75rem; color: var(--clr-text-muted); margin-top: 0.2rem;">الزيارات والتفاعلات خلال الفترة المحددة</p>
+              </div>
+              <span style="font-size: 0.7rem; background: var(--clr-surface-2); padding: 0.25rem 0.6rem; border-radius: 6px; border: 1px solid var(--clr-border); font-weight: 700; color: var(--clr-text-muted);">آخر 30 يوم</span>
+            </div>
+            <div style="display: flex; gap: 1rem; margin-bottom: 1rem; font-size: 0.75rem; font-weight: 700;">
+              <span style="display: flex; align-items: center; gap: 4px; color: #10b981;"><span style="width:8px; height:8px; border-radius:50%; background:#10b981; display:inline-block;"></span>الزوار</span>
+            </div>
+            <div id="chart-visitors" style="flex: 1; min-height: 200px;">
+              <div class="chart-loading">جارٍ تحميل البيانات…</div>
+            </div>
+          </div>
+
+          <!-- Conversion Funnel -->
+          <div class="funnel-panel">
+            <h2 class="funnel-title">قمع التحويل</h2>
+            <p class="funnel-sub">رحلة العميل من الزيارة حتى طلب الخدمة</p>
+            <div class="funnel-stage">
+              <div class="funnel-stage-header">
+                <span class="funnel-stage-name">الزوار</span>
+                <span class="funnel-stage-value" id="funnel-val-visitors">0</span>
+              </div>
+              <div class="funnel-bar-track">
+                <div class="funnel-bar-fill funnel-bar-visitors" id="funnel-bar-visitors" style="width: 100%"></div>
+              </div>
+            </div>
+            <div class="funnel-stage">
+              <div class="funnel-stage-header">
+                <span class="funnel-stage-name">التفاعل مع الموقع</span>
+                <span class="funnel-stage-value" id="funnel-val-engagement">0</span>
+              </div>
+              <div class="funnel-bar-track">
+                <div class="funnel-bar-fill funnel-bar-engagement" id="funnel-bar-engagement" style="width: 40%"></div>
+              </div>
+            </div>
+            <div class="funnel-stage">
+              <div class="funnel-stage-header">
+                <span class="funnel-stage-name">نقرات CTA</span>
+                <span class="funnel-stage-value" id="funnel-val-cta">0</span>
+              </div>
+              <div class="funnel-bar-track">
+                <div class="funnel-bar-fill funnel-bar-cta" id="funnel-bar-cta" style="width: 20%"></div>
+              </div>
+            </div>
+            <div class="funnel-stage" style="margin-bottom: 0.5rem;">
+              <div class="funnel-stage-header">
+                <span class="funnel-stage-name">طلبات الصيانة</span>
+                <span class="funnel-stage-value" id="funnel-val-requests">0</span>
+              </div>
+              <div class="funnel-bar-track">
+                <div class="funnel-bar-fill funnel-bar-requests" id="funnel-bar-requests" style="width: 5%"></div>
+              </div>
+            </div>
+            <div class="funnel-conversion-rate" id="funnel-conversion-rate">0% تحويل</div>
+          </div>
+        </div>
+
+        <!-- Overview Row 2: Channels Performance & Timeline -->
+        <div class="overview-row">
+          <!-- Channels Performance -->
+          <div class="channels-panel">
+            <h2 class="funnel-title">أداء قنوات التواصل</h2>
+            <p class="funnel-sub">كيف يتواصل العملاء مع الشركة؟</p>
+            <div class="channel-row">
+              <div class="channel-header">
+                <span class="channel-name channel-name-whatsapp">💬 واتساب</span>
+                <span class="channel-value" id="chan-val-whatsapp">0 نقرة</span>
+              </div>
+              <div class="channel-track">
+                <div class="channel-fill channel-fill-whatsapp" id="chan-bar-whatsapp" style="width: 0%"></div>
+              </div>
+            </div>
+            <div class="channel-row">
+              <div class="channel-header">
+                <span class="channel-name channel-name-hotline">📞 الخط الساخن</span>
+                <span class="channel-value" id="chan-val-hotline">0 نقرة</span>
+              </div>
+              <div class="channel-track">
+                <div class="channel-fill channel-fill-hotline" id="chan-bar-hotline" style="width: 0%"></div>
+              </div>
+            </div>
+            <div class="channel-row">
+              <div class="channel-header">
+                <span class="channel-name channel-name-requests">🔧 طلبات الصيانة</span>
+                <span class="channel-value" id="chan-val-requests">0 طلب</span>
+              </div>
+              <div class="channel-track">
+                <div class="channel-fill channel-fill-requests" id="chan-bar-requests" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live Timeline -->
+          <div class="timeline-panel">
+            <div class="timeline-header">
+              <h2 style="font-size: 1rem; font-weight: 800;">آخر النشاطات</h2>
+              <div class="timeline-live-badge">
+                <span class="timeline-live-dot"></span>
+                <span>مباشر</span>
+              </div>
+            </div>
+            <div class="timeline-list" id="timeline-events-list">
+              <div class="chart-loading">جارٍ تحميل النشاطات…</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Services Pages Performance (Bottom Panel) -->
+        <div class="table-panel">
+          <div class="table-header">
+            <div>
+              <h2 class="table-title">أداء صفحات الخدمات</h2>
+              <p class="table-subtitle">أداء شبكة الصفحات الـ 42</p>
+            </div>
+            <button class="table-link" id="link-show-all-pages" style="background:none;border:none;cursor:pointer;">عرض جميع الصفحات ←</button>
+          </div>
+          <div class="table-wrap" style="overflow-x: auto;">
+            <table class="dashboard-table">
+              <thead>
+                <tr>
+                  <th>الصفحة</th>
+                  <th>الحالة</th>
+                  <th>الزيارات</th>
+                  <th>واتساب</th>
+                  <th>المكالمات</th>
+                  <th>طلبات</th>
+                  <th>التحويل</th>
+                </tr>
+              </thead>
+              <tbody id="dashboard-pages-tbody">
+                <tr><td colspan="7" class="table-loading" style="text-align: center; padding: 2rem;">جارٍ تحميل أداء الصفحات…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================
+           SECTION: ANALYTICS (Full Premium Stats Page)
+           ====================================================== -->
+      <section id="section-analytics" class="dash-section" hidden>
+        <!-- Section Header: Title (right) + Date Filter (left) -->
+        <div class="anal-header-row">
+          <div class="date-filter" role="group" aria-label="فلتر الإحصائيات">
+            <button data-anal-range="today"     class="range-btn">اليوم</button>
+            <button data-anal-range="yesterday" class="range-btn">أمس</button>
+            <button data-anal-range="7d"        class="range-btn range-active">آخر 7 أيام</button>
+            <button data-anal-range="30d"       class="range-btn">هذا الشهر</button>
+            <button data-anal-range="all"       class="range-btn">كل الوقت</button>
+          </div>
+          <div class="anal-title-block">
+            <h1 class="anal-main-title">الإحصائيات والتحليلات</h1>
+            <p class="anal-main-sub">تحليل شامل لأداء شبكة مواقع الهندسية</p>
+          </div>
+        </div>
+
+        <!-- 6 KPI Cards Row -->
+        <div class="anal-kpi6">
+          <!-- 1: إجمالي الزوار -->
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <span class="kpi-badge kpi-up" id="av-badge-visitors">▲ —</span>
+              <span class="kpi-icon-wrap" style="color:#10b981;background:rgba(16,185,129,.1);">👥</span>
+            </div>
+            <div class="kpi-label">إجمالي الزوار</div>
+            <div class="kpi-value" id="av-visitors">0</div>
+            <div class="kpi-subtext">جميع زيارات الموقع</div>
+          </div>
+          <!-- 2: الزوار الفريدون -->
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <span class="kpi-badge kpi-info">فريدون</span>
+              <span class="kpi-icon-wrap" style="color:#06b6d4;background:rgba(6,182,212,.1);">🧑‍💻</span>
+            </div>
+            <div class="kpi-label">الزوار الفريدون</div>
+            <div class="kpi-value" id="av-unique">0</div>
+            <div class="kpi-subtext">بدون زيارات مكررة</div>
+          </div>
+          <!-- 3: مشاهدات الصفحات -->
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <span class="kpi-badge kpi-info" id="av-pv-badge">0 ز/ص</span>
+              <span class="kpi-icon-wrap" style="color:#10b981;background:rgba(16,185,129,.1);">👁️</span>
+            </div>
+            <div class="kpi-label">مشاهدات الصفحات</div>
+            <div class="kpi-value" id="av-pageviews">0</div>
+            <div class="kpi-subtext" id="av-pv-ratio">0 مشاهدة لكل زائر</div>
+          </div>
+          <!-- 4: إجمالي التفاعلات -->
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <span class="kpi-badge kpi-up" id="av-interact-badge">0%</span>
+              <span class="kpi-icon-wrap" style="color:#f59e0b;background:rgba(245,158,11,.1);">⚡</span>
+            </div>
+            <div class="kpi-label">إجمالي التفاعلات</div>
+            <div class="kpi-value" id="av-interactions">0</div>
+            <div class="kpi-subtext">واتساب + خط ساخن</div>
+          </div>
+          <!-- 5: طلبات الصيانة -->
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <span class="kpi-badge kpi-up">▲ 8.7%</span>
+              <span class="kpi-icon-wrap" style="color:#f59e0b;background:rgba(245,158,11,.1);">🔧</span>
+            </div>
+            <div class="kpi-label">طلبات الصيانة</div>
+            <div class="kpi-value" id="av-forms">0</div>
+            <div class="kpi-subtext">طلب صيانة مقدم</div>
+          </div>
+          <!-- 6: معدل التحويل -->
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <span class="kpi-badge kpi-up" id="av-conv-badge">▲ —</span>
+              <span class="kpi-icon-wrap" style="color:#10b981;background:rgba(16,185,129,.1);">🔄</span>
+            </div>
+            <div class="kpi-label">معدل التحويل</div>
+            <div class="kpi-value" id="av-conversion">0%</div>
+            <div class="kpi-subtext">زائر ← تفاعل</div>
+          </div>
+        </div>
+
+        <!-- Charts Row: Multi-line (2/3) + Donut (1/3) -->
+        <div class="anal-chart-row">
+          <!-- Multi-Line Trend Chart -->
+          <div class="settings-card anal-trend-card">
+            <div class="anal-trend-header">
+              <div>
+                <h2 class="anal-card-title">اتجاه الزيارات</h2>
+                <p class="anal-card-sub">تطور الزيارات والتفاعلات خلال الفترة</p>
+              </div>
+              <span class="anal-period-tag" id="av-period-tag">آخر 7 أيام</span>
+            </div>
+            <div class="anal-legend">
+              <span class="anal-legend-item"><span style="background:#10b981;"></span>الزوار</span>
+              <span class="anal-legend-item"><span style="background:#06b6d4;"></span>التفاعلات</span>
+              <span class="anal-legend-item"><span style="background:#f59e0b;"></span>طلبات الصيانة</span>
+            </div>
+            <div id="av-multiline-chart" style="min-height:220px;">
+              <div class="chart-loading">جارٍ تحميل البيانات…</div>
+            </div>
+          </div>
+          <!-- Donut Chart: Traffic Sources -->
+          <div class="settings-card anal-donut-card">
+            <h2 class="anal-card-title">مصادر الزيارات</h2>
+            <p class="anal-card-sub">توزيع الزوار حسب المصدر</p>
+            <div id="av-donut-chart" class="av-donut-wrap">
+              <div class="chart-loading">جارٍ التحميل…</div>
+            </div>
+            <div id="av-donut-legend" class="av-donut-legend"></div>
+          </div>
+        </div>
+
+        <!-- Analysis Row: Funnel (1/2) + Channels (1/2) -->
+        <div class="anal-analysis-row">
+          <!-- Conversion Funnel -->
+          <div class="settings-card">
+            <h2 class="anal-card-title">تحليل التحويل</h2>
+            <p class="anal-card-sub" style="margin-bottom:1.5rem;">رحلة العميل من زيارة الموقع للتحويل</p>
+            <div class="av-funnel-stage">
+              <div class="av-funnel-meta">
+                <span class="av-funnel-val" id="avf-val-visitors">0</span>
+                <span class="av-funnel-name">الزيارة</span>
+              </div>
+              <div class="av-funnel-track"><div class="av-funnel-bar" id="avf-bar-visitors" style="width:100%;background:linear-gradient(90deg,#10b981,#059669);"></div></div>
+              <span class="av-funnel-pct av-funnel-pct-hidden">100%</span>
+            </div>
+            <div class="av-funnel-stage">
+              <div class="av-funnel-meta">
+                <span class="av-funnel-val" id="avf-val-engagement">0</span>
+                <span class="av-funnel-name">التفاعل مع الموقع</span>
+              </div>
+              <div class="av-funnel-track"><div class="av-funnel-bar" id="avf-bar-engagement" style="width:40%;background:linear-gradient(90deg,#06b6d4,#0891b2);"></div></div>
+              <span class="av-funnel-pct" id="avf-pct-engagement">0% تحويل</span>
+            </div>
+            <div class="av-funnel-stage">
+              <div class="av-funnel-meta">
+                <span class="av-funnel-val" id="avf-val-cta">0</span>
+                <span class="av-funnel-name">نقرات CTA</span>
+              </div>
+              <div class="av-funnel-track"><div class="av-funnel-bar" id="avf-bar-cta" style="width:20%;background:linear-gradient(90deg,#3b82f6,#2563eb);"></div></div>
+              <span class="av-funnel-pct" id="avf-pct-cta">0% تحويل</span>
+            </div>
+            <div class="av-funnel-stage">
+              <div class="av-funnel-meta">
+                <span class="av-funnel-val" id="avf-val-forms">0</span>
+                <span class="av-funnel-name">طلبات الصيانة</span>
+              </div>
+              <div class="av-funnel-track"><div class="av-funnel-bar" id="avf-bar-forms" style="width:5%;background:linear-gradient(90deg,#f59e0b,#d97706);"></div></div>
+              <span class="av-funnel-pct" id="avf-pct-forms">0% تحويل</span>
+            </div>
+          </div>
+
+          <!-- Channels Performance -->
+          <div class="settings-card">
+            <h2 class="anal-card-title">أداء قنوات التواصل</h2>
+            <p class="anal-card-sub" style="margin-bottom:1.75rem;">مقارنة قنوات الدعم المباشر</p>
+            <div class="av-channel-row">
+              <div class="av-channel-header">
+                <span class="av-channel-name" style="color:#10b981;">💬 واتساب</span>
+                <span class="av-channel-val" id="avc-wa-val">0 نقرة</span>
+              </div>
+              <div class="av-channel-track">
+                <div class="av-channel-fill" id="avc-wa-bar" style="background:linear-gradient(90deg,#10b981,#059669);width:0%;"></div>
+              </div>
+            </div>
+            <div class="av-channel-row">
+              <div class="av-channel-header">
+                <span class="av-channel-name" style="color:#f59e0b;">📞 الخط الساخن</span>
+                <span class="av-channel-val" id="avc-hl-val">0 مكالمة</span>
+              </div>
+              <div class="av-channel-track">
+                <div class="av-channel-fill" id="avc-hl-bar" style="background:linear-gradient(90deg,#f59e0b,#d97706);width:0%;"></div>
+              </div>
+            </div>
+            <div class="av-channel-row">
+              <div class="av-channel-header">
+                <span class="av-channel-name" style="color:#8b5cf6;">🔧 طلبات الصيانة</span>
+                <span class="av-channel-val" id="avc-rq-val">0 طلب</span>
+              </div>
+              <div class="av-channel-track">
+                <div class="av-channel-fill" id="avc-rq-bar" style="background:linear-gradient(90deg,#8b5cf6,#7c3aed);width:0%;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Best Pages Table -->
+        <div class="table-panel" style="margin-top:0;">
+          <div class="table-header">
+            <div>
+              <h2 class="table-title">أفضل صفحات الخدمات</h2>
+              <p class="table-subtitle">الصفحات الأكثر زيارة وتحويلاً</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="dashboard-table">
+              <thead>
+                <tr>
+                  <th>الصفحة</th>
+                  <th>الحالة</th>
+                  <th>الزيارات</th>
+                  <th>واتساب</th>
+                  <th>المكالمات</th>
+                  <th>طلبات</th>
+                  <th>التحويل</th>
+                </tr>
+              </thead>
+              <tbody id="av-pages-tbody">
+                <tr><td colspan="7" class="table-loading" style="text-align:center;padding:2rem;">جاري تحميل البيانات…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================
+           SECTION: MAINTENANCE REQUESTS (طلبات الصيانة)
+           ====================================================== -->
+      <section id="section-requests" class="dash-section" hidden>
+        <!-- Section Header -->
+        <div class="anal-header-row">
+          <div style="display:flex;gap:10px;">
+            <button id="btn-open-add-request" class="btn-primary-action">
+              <span>+</span> طلب جديد
+            </button>
+          </div>
+          <div class="anal-title-block">
+            <h1 class="anal-main-title">طلبات الصيانة</h1>
+            <p class="anal-main-sub">إدارة طلبات الصيانة الواردة من صفحات الخدمات</p>
+          </div>
+        </div>
+
+        <!-- 5 Status KPI Cards -->
+        <div class="requests-kpi-row">
+          <!-- إجمالي الطلبات -->
+          <div class="kpi-card">
+            <div class="kpi-label">إجمالي الطلبات</div>
+            <div class="kpi-value" id="req-kpi-total">287</div>
+          </div>
+          <!-- جديد -->
+          <div class="kpi-card">
+            <div class="kpi-label">جديد</div>
+            <div class="kpi-value" id="req-kpi-new" style="color:#06b6d4;">64</div>
+          </div>
+          <!-- قيد المتابعة -->
+          <div class="kpi-card">
+            <div class="kpi-label">قيد المتابعة</div>
+            <div class="kpi-value" id="req-kpi-pending" style="color:#f59e0b;">98</div>
+          </div>
+          <!-- مكتمل -->
+          <div class="kpi-card">
+            <div class="kpi-label">مكتمل</div>
+            <div class="kpi-value" id="req-kpi-completed" style="color:#10b981;">112</div>
+          </div>
+          <!-- ملغي -->
+          <div class="kpi-card">
+            <div class="kpi-label">ملغي</div>
+            <div class="kpi-value" id="req-kpi-cancelled" style="color:#ef4444;">13</div>
+          </div>
+        </div>
+
+        <!-- Requests Table Panel -->
+        <div class="table-panel">
+          <div class="table-header">
+            <h2 class="table-title">جميع الطلبات</h2>
+          </div>
+
+          <div style="padding: 0 1rem 1rem 1rem;">
+            <div class="search-box-wrap">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.637 10.636Z" />
+              </svg>
+              <input type="text" id="requests-search-input" placeholder="بحث عن طلب..." />
+            </div>
+          </div>
+
+          <div class="table-wrap" style="overflow-x:auto;">
+            <table class="dashboard-table">
+              <thead>
+                <tr>
+                  <th>رقم الطلب</th>
+                  <th>اسم العميل</th>
+                  <th>نوع الجهاز</th>
+                  <th>المشكلة</th>
+                  <th>الصفحة المصدر</th>
+                  <th>التاريخ</th>
+                  <th>الحالة</th>
+                  <th style="text-align:center;">الإجراء</th>
+                </tr>
+              </thead>
+              <tbody id="requests-tbody">
+                <tr><td colspan="8" class="table-loading" style="text-align:center;padding:2rem;">جاري تحميل طلبات الصيانة...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================
+           SECTION: SERVICES PAGES (صفحات الخدمات)
+           ====================================================== -->
+      <section id="section-pages" class="dash-section" hidden>
+        <!-- Section Header -->
+        <div class="anal-header-row">
+          <div style="display:flex;gap:10px;">
+            <button class="btn-primary-action">
+              <span>+</span> صفحة جديدة
+            </button>
+          </div>
+          <div class="anal-title-block">
+            <h1 class="anal-main-title">صفحات الخدمات</h1>
+            <p class="anal-main-sub">إدارة شبكة الصفحات الـ 42 لعلامات الأجهزة</p>
+          </div>
+        </div>
+
+        <!-- 4 KPI Cards -->
+        <div class="requests-kpi-row" style="grid-template-columns: repeat(4, 1fr);">
+          <div class="kpi-card">
+            <div class="kpi-label">إجمالي الصفحات</div>
+            <div class="kpi-value" id="srv-kpi-total">42</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">صفحات نشطة</div>
+            <div class="kpi-value" id="srv-kpi-active">39</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">إجمالي الزيارات</div>
+            <div class="kpi-value" id="srv-kpi-visits">31,418</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">متوسط التحويل</div>
+            <div class="kpi-value" id="srv-kpi-conv">9.1%</div>
+          </div>
+        </div>
+
+        <!-- Services Pages Table Panel -->
+        <div class="table-panel">
+          <div class="table-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+            <h2 class="table-title">جميع الصفحات</h2>
+            <div style="display:flex; gap:0.75rem; align-items:center;">
+              <select style="background:var(--clr-surface-2);color:var(--clr-text);border:1px solid var(--clr-border);border-radius:8px;padding:0.4rem 0.8rem;font-family:Cairo,sans-serif;font-size:0.8rem;outline:none;">
+                <option>الزيارات</option>
+                <option>التحويل</option>
+              </select>
+              <select style="background:var(--clr-surface-2);color:var(--clr-text);border:1px solid var(--clr-border);border-radius:8px;padding:0.4rem 0.8rem;font-family:Cairo,sans-serif;font-size:0.8rem;outline:none;">
+                <option>كل الحالات</option>
+                <option>نشط</option>
+                <option>مسودة</option>
+              </select>
+              <div class="search-box-wrap" style="margin:0; width:200px;">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.637 10.636Z" />
+                </svg>
+                <input type="text" placeholder="بحث..." />
+              </div>
+            </div>
+          </div>
+
+          <div class="table-wrap" style="overflow-x:auto;">
+            <table class="dashboard-table">
+              <thead>
+                <tr>
+                  <th>اسم الصفحة</th>
+                  <th>الحالة</th>
+                  <th>الزيارات</th>
+                  <th>واتساب</th>
+                  <th>المكالمات</th>
+                  <th>طلبات الصيانه</th>
+                  <th>معدل التحويل</th>
+                  <th style="text-align:center;">إجراء</th>
+                </tr>
+              </thead>
+              <tbody id="pages-tbody">
+                <tr><td colspan="8" class="table-loading" style="text-align:center;padding:2rem;">جاري تحميل صفحات الخدمات...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================
+           SECTION: WEBSITE SETTINGS (إعدادات الموقع)
+           ====================================================== -->
+      <section id="section-settings" class="dash-section" hidden>
+        <div class="anal-header-row" style="margin-bottom: 1.5rem;">
+          <div class="anal-title-block">
+            <h1 class="anal-main-title">إعدادات الموقع</h1>
+            <p class="anal-main-sub">تحديث محتوى ومعلومات الموقع العام</p>
+          </div>
+        </div>
+
+        <form id="settings-form" style="display:flex; flex-direction:column; gap:1.5rem;">
+          <!-- Card 1: معلومات التواصل -->
+          <div class="form-card-box">
+            <h2 class="form-card-title">معلومات التواصل</h2>
+            <p class="form-card-sub">تحديث هذه البيانات ينعكس على الموقع العام</p>
+
+            <div class="form-grid-2">
+              <div class="settings-field">
+                <label class="settings-label"><span class="settings-icon">📞</span> رقم الواتساب</label>
+                <input type="text" id="set-whatsapp" class="settings-input" value="4567 123 100 20+" placeholder="4567 123 100 20+" dir="ltr" style="text-align:right;" />
+              </div>
+              <div class="settings-field">
+                <label class="settings-label"><span class="settings-icon">📞</span> الخط الساخن</label>
+                <input type="text" id="set-hotline" class="settings-input" value="19000" placeholder="19000" />
+              </div>
+              <div class="settings-field">
+                <label class="settings-label"><span class="settings-icon">✉️</span> البريد الإلكتروني</label>
+                <input type="email" id="set-email" class="settings-input" value="info@elhandasa.com" placeholder="info@elhandasa.com" dir="ltr" style="text-align:right;" />
+              </div>
+              <div class="settings-field">
+                <label class="settings-label"><span class="settings-icon">🕒</span> ساعات العمل</label>
+                <input type="text" id="set-hours" class="settings-input" value="السبت - الخميس: 9 ص - 9 م" placeholder="السبت - الخميس: 9 ص - 9 م" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 2: محتوى الصفحة الرئيسية -->
+          <div class="form-card-box">
+            <h2 class="form-card-title">محتوى الصفحة الرئيسية</h2>
+            <p class="form-card-sub">العناوين والوصف الظاهر للزوار</p>
+
+            <div style="display:flex; flex-direction:column; gap:1.25rem;">
+              <div class="settings-field">
+                <label class="settings-label"><span class="settings-icon">💬</span> عنوان Hero</label>
+                <input type="text" id="set-hero-title" class="settings-input" value="الهندسية للتوكيلات للصيانة" placeholder="الهندسية للتوكيلات للصيانة" />
+              </div>
+              <div class="settings-field">
+                <label class="settings-label"><span class="settings-icon">💬</span> وصف Hero</label>
+                <textarea id="set-hero-sub" rows="3" class="settings-textarea" placeholder="خدمات صيانة احترافية لجميع ماركات الأجهزة المنزلية بأيدي فنيين معتمدين">خدمات صيانة احترافية لجميع ماركات الأجهزة المنزلية بأيدي فنيين معتمدين.</textarea>
+              </div>
+
+              <div class="form-grid-2">
+                <div class="settings-field">
+                  <label class="settings-label"><span class="settings-icon">💬</span> عنوان الخدمات</label>
+                  <input type="text" id="set-services-title" class="settings-input" value="خدماتنا" placeholder="خدماتنا" />
+                </div>
+                <div class="settings-field">
+                  <label class="settings-label"><span class="settings-icon">💬</span> وصف الخدمات</label>
+                  <input type="text" id="set-services-sub" class="settings-input" value="نقدم خدمات صيانة شاملة لجميع أنواع الأجهزة المنزلية." placeholder="نقدم خدمات صيانة شاملة لجميع أنواع الأجهزة المنزلية." />
+                </div>
+              </div>
+
+              <div class="form-grid-2">
+                <div class="settings-field">
+                  <label class="settings-label"><span class="settings-icon">💬</span> عنوان التقييمات</label>
+                  <input type="text" id="set-testimonials-title" class="settings-input" value="آراء عملائنا" placeholder="آراء عملائنا" />
+                </div>
+                <div class="settings-field">
+                  <label class="settings-label"><span class="settings-icon">💬</span> عنوان "لماذا نحن؟"</label>
+                  <input type="text" id="set-why-title" class="settings-input" value="لماذا نحن؟" placeholder="لماذا نحن؟" />
+                </div>
+              </div>
+
+              <div class="settings-field">
+                <label class="settings-label"><span class="settings-icon">💬</span> وصف "لماذا نحن؟"</label>
+                <textarea id="set-why-sub" rows="3" class="settings-textarea" placeholder="فنيون معتمدون، ضمان على الإصلاح، وقطع غيار أصلية.">فنيون معتمدون، ضمان على الإصلاح، وقطع غيار أصلية.</textarea>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:flex-end;">
+            <button type="submit" class="btn-save-settings">
+              <span>💾</span> حفظ التغييرات
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ======================================================
+           SECTION: USERS (المستخدمون)
+           ====================================================== -->
+      <section id="section-users" class="dash-section" hidden>
+        <div class="anal-header-row" style="justify-content:space-between;align-items:center;">
+          <div class="anal-title-block">
+            <h1 class="anal-main-title">المستخدمون</h1>
+            <p class="anal-main-sub">إدارة مستخدمي لوحة التحكم بالصلاحيات</p>
+          </div>
+           <button id="btn-open-add-user" class="btn-primary-action" style="display:none;align-items:center;gap:6px;padding:0.6rem 1.2rem;">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width:18px;height:18px;">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766Z" />
+            </svg>
+            مستخدم جديد
+          </button>
+        </div>
+
+        <!-- Role permission guide cards -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.75rem;margin-bottom:1.5rem;">
+          <div class="glass-card" style="padding:1rem;border-right:3px solid #ef4444;">
+            <div style="font-weight:700;color:#ef4444;font-size:0.85rem;margin-bottom:0.4rem;">🛡️ مدير النظام</div>
+            <div style="font-size:0.75rem;color:var(--clr-text-muted);line-height:1.6;">كامل الصلاحيات — تعديل، حذف، إدارة مستخدمين</div>
+          </div>
+          <div class="glass-card" style="padding:1rem;border-right:3px solid #3b82f6;">
+            <div style="font-weight:700;color:#3b82f6;font-size:0.85rem;margin-bottom:0.4rem;">✏️ محرر</div>
+            <div style="font-size:0.75rem;color:var(--clr-text-muted);line-height:1.6;">تعديل الطلبات والإعدادات — بدون إدارة مستخدمين</div>
+          </div>
+          <div class="glass-card" style="padding:1rem;border-right:3px solid #f59e0b;">
+            <div style="font-weight:700;color:#f59e0b;font-size:0.85rem;margin-bottom:0.4rem;">📊 ميديا باير</div>
+            <div style="font-size:0.75rem;color:var(--clr-text-muted);line-height:1.6;">مشاهدة الإحصائيات فقط — بدون تعديل أي بيانات</div>
+          </div>
+          <div class="glass-card" style="padding:1rem;border-right:3px solid #10b981;">
+            <div style="font-weight:700;color:#10b981;font-size:0.85rem;margin-bottom:0.4rem;">👁️ مشاهد</div>
+            <div style="font-size:0.75rem;color:var(--clr-text-muted);line-height:1.6;">عرض الإحصائيات والطلبات فقط — بدون تعديل</div>
+          </div>
+        </div>
+
+        <div class="table-panel">
+          <div class="table-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+            <h2 class="table-title">المستخدمون</h2>
+            <div style="display:flex;gap:0.75rem;align-items:center;">
+              <div class="search-box-wrap" style="margin:0;width:180px;">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.637 10.636Z" />
+                </svg>
+                <input type="text" id="users-search" placeholder="بحث..." />
+              </div>
+              <select id="users-role-filter" style="background:var(--clr-surface-2);color:var(--clr-text);border:1px solid var(--clr-border);border-radius:8px;padding:0.4rem 0.8rem;font-family:Cairo,sans-serif;font-size:0.8rem;outline:none;">
+                <option value="">كل الأدوار</option>
+                <option value="admin">مدير النظام</option>
+                <option value="editor">محرر</option>
+                <option value="media_buyer">ميديا باير</option>
+                <option value="viewer">مشاهد</option>
+              </select>
+            </div>
+          </div>
+          <div class="table-wrap" style="overflow-x:auto;">
+            <table class="dashboard-table">
+              <thead>
+                <tr>
+                  <th>الاسم</th>
+                  <th>البريد الإلكتروني</th>
+                  <th>الدور</th>
+                  <th>الحالة</th>
+                  <th>آخر نشاط</th>
+                  <th>إجراء</th>
+                </tr>
+              </thead>
+              <tbody id="users-tbody">
+                <tr><td colspan="6" class="table-loading" style="text-align:center;padding:2rem;">جاري تحميل المستخدمين...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================
+           SECTION: ACTIVITY LOG (سجل النشاطات)
+           ====================================================== -->
+      <section id="section-events" class="dash-section" hidden>
+        <div class="anal-header-row">
+          <div class="anal-title-block">
+            <h1 class="anal-main-title">سجل النشاطات</h1>
+            <p class="anal-main-sub">سجل لحظي لجميع الأحداث على شبكة الصفحات</p>
+          </div>
+        </div>
+
+        <div class="table-panel">
+          <!-- Header: title + filters -->
+          <div class="table-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+            <h2 class="table-title">آخر الأحداث</h2>
+            <div style="display:flex; gap:0.75rem; align-items:center;">
+              <div class="search-box-wrap" style="margin:0; width:180px;">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.637 10.636Z" />
+                </svg>
+                <input type="text" id="events-search" placeholder="بحث..." />
+              </div>
+              <select id="events-type-filter" style="background:var(--clr-surface-2);color:var(--clr-text);border:1px solid var(--clr-border);border-radius:8px;padding:0.4rem 0.8rem;font-family:Cairo,sans-serif;font-size:0.8rem;outline:none;">
+                <option value="">كل الأنواع</option>
+                <option value="page_view">زيارة صفحة</option>
+                <option value="whatsapp_click">نقرة واتساب</option>
+                <option value="hotline_click">نقرة اتصال</option>
+                <option value="form_submit">طلب صيانة</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="table-wrap" style="overflow-x:auto;">
+            <table class="dashboard-table">
+              <thead>
+                <tr>
+                  <th>نوع الحدث</th>
+                  <th>الصفحة</th>
+                  <th>المصدر</th>
+                  <th>المرجع</th>
+                  <th>التوقيت</th>
+                </tr>
+              </thead>
+              <tbody id="events-tbody">
+                <tr><td colspan="5" class="table-loading" style="text-align:center;padding:2rem;">جاري تحميل سجل النشاطات...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================
+           SECTION: SYSTEM SETTINGS (إعدادات النظام)
+           ====================================================== -->
+      <section id="section-system-settings" class="dash-section" hidden>
+        <div class="anal-header-row">
+          <div class="anal-title-block">
+            <h1 class="anal-main-title">الإعدادات</h1>
+            <p class="anal-main-sub">إعدادات النظام والحساب</p>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:1.25rem; margin-top:1.5rem;">
+          <!-- Card 1: Language & Region -->
+          <div class="glass-card sys-card" onclick="openSysModal('language')" style="cursor:pointer; padding:1.75rem; display:flex; align-items:center; justify-content:space-between; transition:var(--transition); border:1px solid var(--clr-border);">
+            <div style="display:flex; align-items:center; gap:1.25rem; flex:1;">
+              <span class="sys-icon-bg" style="width:48px; height:48px; border-radius:12px; background:rgba(59,130,246,0.12); display:flex; align-items:center; justify-content:center; color:#3b82f6; font-size:1.5rem;">🌐</span>
+              <div style="text-align:right;">
+                <h3 style="font-size:1.1rem; font-weight:700; color:var(--clr-text); margin-bottom:0.25rem;">اللغة والمنطقة</h3>
+                <p style="font-size:0.82rem; color:var(--clr-text-muted);">اللغة الافتراضية والمنطقة الزمنية</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 2: Notifications -->
+          <div class="glass-card sys-card" onclick="openSysModal('notifications')" style="cursor:pointer; padding:1.75rem; display:flex; align-items:center; justify-content:space-between; transition:var(--transition); border:1px solid var(--clr-border);">
+            <div style="display:flex; align-items:center; gap:1.25rem; flex:1;">
+              <span class="sys-icon-bg" style="width:48px; height:48px; border-radius:12px; background:rgba(239,68,68,0.12); display:flex; align-items:center; justify-content:center; color:#ef4444; font-size:1.5rem;">🔔</span>
+              <div style="text-align:right;">
+                <h3 style="font-size:1.1rem; font-weight:700; color:var(--clr-text); margin-bottom:0.25rem;">الإشعارات</h3>
+                <p style="font-size:0.82rem; color:var(--clr-text-muted);">إدارة تفضيلات الإشعارات والتنبيهات</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 3: Security -->
+          <div class="glass-card sys-card" onclick="openSysModal('security')" style="cursor:pointer; padding:1.75rem; display:flex; align-items:center; justify-content:space-between; transition:var(--transition); border:1px solid var(--clr-border);">
+            <div style="display:flex; align-items:center; gap:1.25rem; flex:1;">
+              <span class="sys-icon-bg" style="width:48px; height:48px; border-radius:12px; background:rgba(16,185,129,0.12); display:flex; align-items:center; justify-content:center; color:#10b981; font-size:1.5rem;">🛡️</span>
+              <div style="text-align:right;">
+                <h3 style="font-size:1.1rem; font-weight:700; color:var(--clr-text); margin-bottom:0.25rem;">الأمان</h3>
+                <p style="font-size:0.82rem; color:var(--clr-text-muted);">كلمة المرور والمصادقة الثنائية</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 4: Appearance -->
+          <div class="glass-card sys-card" onclick="openSysModal('appearance')" style="cursor:pointer; padding:1.75rem; display:flex; align-items:center; justify-content:space-between; transition:var(--transition); border:1px solid var(--clr-border);">
+            <div style="display:flex; align-items:center; gap:1.25rem; flex:1;">
+              <span class="sys-icon-bg" style="width:48px; height:48px; border-radius:12px; background:rgba(245,158,11,0.12); display:flex; align-items:center; justify-content:center; color:#f59e0b; font-size:1.5rem;">🎨</span>
+              <div style="text-align:right;">
+                <h3 style="font-size:1.1rem; font-weight:700; color:var(--clr-text); margin-bottom:0.25rem;">المظهر</h3>
+                <p style="font-size:0.82rem; color:var(--clr-text-muted);">سمة الواجهة والثيم</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 5: Backup & Restore -->
+          <div class="glass-card sys-card" onclick="openSysModal('backup')" style="cursor:pointer; padding:1.75rem; display:flex; align-items:center; justify-content:space-between; transition:var(--transition); border:1px solid var(--clr-border); grid-column: span 2;">
+            <div style="display:flex; align-items:center; gap:1.25rem; flex:1;">
+              <span class="sys-icon-bg" style="width:48px; height:48px; border-radius:12px; background:rgba(139,92,246,0.12); display:flex; align-items:center; justify-content:center; color:#8b5cf6; font-size:1.5rem;">🗄️</span>
+              <div style="text-align:right;">
+                <h3 style="font-size:1.1rem; font-weight:700; color:var(--clr-text); margin-bottom:0.25rem;">النسخ الاحتياطي</h3>
+                <p style="font-size:0.82rem; color:var(--clr-text-muted);">تصدير واستيراد البيانات والنسخ الاحتياطية</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ============================================================
+       MODAL DIALOGS (لوحات النوافذ المنبثقة)
+       ============================================================ -->
+
+  <!-- Modal: Add new dashboard user -->
+  <div id="modal-add-user" class="modal-overlay" style="display:none;">
+    <div class="modal-content glass-card" style="max-width:480px;width:95%;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="color:var(--clr-primary);display:flex;align-items:center;gap:6px;">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:20px;height:20px;">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766Z" />
+          </svg>
+          إضافة مستخدم جديد
+        </h3>
+        <button class="modal-close-btn" onclick="document.getElementById('modal-add-user').style.display='none'">✖</button>
+      </div>
+      <form id="add-user-form" style="display:flex;flex-direction:column;gap:1.25rem;margin-top:1.25rem;">
+        <div class="settings-field">
+          <label class="settings-label" for="add-user-name">الاسم الكامل *</label>
+          <input id="add-user-name" type="text" class="settings-input" placeholder="مثال: أحمد محمد" required />
+        </div>
+        <div class="settings-field">
+          <label class="settings-label" for="add-user-email">البريد الإلكتروني *</label>
+          <input id="add-user-email" type="email" class="settings-input" placeholder="user@example.com" required style="direction:ltr;text-align:right;" />
+        </div>
+        <div class="settings-field">
+          <label class="settings-label" for="add-user-role">الدور والصلاحيات *</label>
+          <select id="add-user-role" class="settings-input" required style="height:44px;font-family:Cairo,sans-serif;font-weight:600;cursor:pointer;">
+            <option value="">اختر الدور...</option>
+            <option value="admin">🛡️ مدير النظام</option>
+            <option value="editor">✏️ محرر — تعديل بدون إدارة مستخدمين</option>
+            <option value="media_buyer">📊 ميديا باير — مشاهدة الإحصائيات فقط</option>
+            <option value="viewer">👁️ مشاهد — عرض فقط</option>
+          </select>
+        </div>
+
+        <!-- Interactive Custom Permissions -->
+        <div id="add-user-perms-wrapper" style="background:rgba(255,255,255,0.02);border:1px solid var(--clr-border);border-radius:10px;padding:1rem;display:flex;flex-direction:column;gap:0.75rem;">
+          <div style="font-size:0.85rem;font-weight:700;color:var(--clr-text-muted);margin-bottom:0.25rem;border-bottom:1px solid rgba(255,255,255,0.05);padding-bottom:0.4rem;">🔧 تخصيص الصلاحيات الممنوحة:</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem 1rem;font-size:0.85rem;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--clr-text);font-weight:600;">
+              <input type="checkbox" id="add-perm-view-analytics" checked style="width:16px;height:16px;accent-color:var(--clr-primary);cursor:pointer;" /> عرض الإحصائيات
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--clr-text);font-weight:600;">
+              <input type="checkbox" id="add-perm-view-requests" checked style="width:16px;height:16px;accent-color:var(--clr-primary);cursor:pointer;" /> عرض طلبات الصيانة
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--clr-text);font-weight:600;">
+              <input type="checkbox" id="add-perm-edit-requests" checked style="width:16px;height:16px;accent-color:var(--clr-primary);cursor:pointer;" /> تعديل طلبات الصيانة
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--clr-text);font-weight:600;">
+              <input type="checkbox" id="add-perm-view-settings" checked style="width:16px;height:16px;accent-color:var(--clr-primary);cursor:pointer;" /> عرض الإعدادات
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--clr-text);font-weight:600;">
+              <input type="checkbox" id="add-perm-edit-settings" checked style="width:16px;height:16px;accent-color:var(--clr-primary);cursor:pointer;" /> تعديل إعدادات الموقع
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--clr-text);font-weight:600;">
+              <input type="checkbox" id="add-perm-manage-users" style="width:16px;height:16px;accent-color:var(--clr-primary);cursor:pointer;" /> إدارة المستخدمين
+            </label>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:0.75rem;margin-top:1rem;border-top:1px solid var(--clr-border);padding-top:1.25rem;">
+          <button type="button" class="settings-btn-save" style="flex:1;background:var(--clr-surface-2);border-color:var(--clr-border);color:var(--clr-text);" onclick="document.getElementById('modal-add-user').style.display='none'">إلغاء</button>
+          <button type="submit" id="add-user-submit-btn" class="settings-btn-save" style="flex:1;">إضافة المستخدم</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: View Request details -->
+  <div id="modal-view-request" class="modal-overlay" style="display:none;">
+    <div class="modal-content glass-card" style="max-width:550px;width:95%;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="color:var(--clr-primary);display:flex;align-items:center;gap:6px;">👁️ تفاصيل طلب الصيانة</h3>
+        <button class="modal-close-btn" onclick="document.getElementById('modal-view-request').style.display='none'">✖</button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:1rem;margin-top:1.25rem;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;font-size:0.85rem;">
+          <div>
+            <span style="color:var(--clr-text-muted);display:block;margin-bottom:2px;">رقم الطلب:</span>
+            <strong id="view-req-id" style="font-size:1.1rem;color:#fff;">—</strong>
+          </div>
+          <div>
+            <span style="color:var(--clr-text-muted);display:block;margin-bottom:2px;">الحالة:</span>
+            <span id="view-req-status" class="req-status-badge">—</span>
+          </div>
+          <div>
+            <span style="color:var(--clr-text-muted);display:block;margin-bottom:2px;">اسم العميل:</span>
+            <strong id="view-req-name" style="font-size:1rem;">—</strong>
+          </div>
+          <div>
+            <span style="color:var(--clr-text-muted);display:block;margin-bottom:2px;">رقم الهاتف:</span>
+            <strong id="view-req-phone" style="font-size:1rem;direction:ltr;display:inline-block;">—</strong>
+          </div>
+          <div>
+            <span style="color:var(--clr-text-muted);display:block;margin-bottom:2px;">نوع الجهاز:</span>
+            <strong id="view-req-appliance">—</strong>
+          </div>
+          <div>
+            <span style="color:var(--clr-text-muted);display:block;margin-bottom:2px;">المشكلة / العطل:</span>
+            <strong id="view-req-problem">—</strong>
+          </div>
+          <div>
+            <span style="color:var(--clr-text-muted);display:block;margin-bottom:2px;">المحافظة:</span>
+            <strong id="view-req-gov">—</strong>
+          </div>
+          <div>
+            <span style="color:var(--clr-text-muted);display:block;margin-bottom:2px;">الصفحة المصدر:</span>
+            <strong id="view-req-page" style="text-transform:uppercase;">—</strong>
+          </div>
+          <div style="grid-column: span 2;">
+            <span style="color:var(--clr-text-muted);display:block;margin-bottom:2px;">تاريخ التقديم:</span>
+            <strong id="view-req-date">—</strong>
+          </div>
+        </div>
+
+        <!-- Call & Whatsapp Actions -->
+        <div style="display:flex;gap:0.75rem;margin-top:1.25rem;border-top:1px solid var(--clr-border);padding-top:1.25rem;">
+          <a id="btn-view-call" href="#" class="settings-btn-save" style="flex:1;background:#f59e0b;color:#1e1b4b;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px;padding:0.75rem;border-radius:8px;text-decoration:none;border:none;cursor:pointer;text-align:center;">
+            📞 اتصال بالعميل
+          </a>
+          <a id="btn-view-wa" href="#" target="_blank" class="settings-btn-save" style="flex:1;background:#10b981;color:#1e1b4b;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px;padding:0.75rem;border-radius:8px;text-decoration:none;border:none;cursor:pointer;text-align:center;">
+            💬 مراسلة واتساب
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add/Edit Request -->
+  <div id="modal-edit-request" class="modal-overlay" style="display:none;">
+    <div class="modal-content glass-card" style="max-width:550px;width:95%;">
+      <div class="modal-header">
+        <h3 id="edit-modal-title" class="modal-title" style="color:var(--clr-primary);">✏️ تعديل طلب الصيانة</h3>
+        <button class="modal-close-btn" onclick="document.getElementById('modal-edit-request').style.display='none'">✖</button>
+      </div>
+      <form id="edit-request-form" style="margin-top:1.25rem;display:flex;flex-direction:column;gap:1rem;">
+        <input type="hidden" id="edit-req-id" />
+        
+        <div class="settings-field">
+          <label for="edit-req-name" class="settings-label">اسم العميل:</label>
+          <input type="text" id="edit-req-name" required class="settings-input" />
+        </div>
+        
+        <div class="settings-field">
+          <label for="edit-req-phone" class="settings-label">رقم الهاتف:</label>
+          <input type="text" id="edit-req-phone" required class="settings-input" />
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+          <div class="settings-field">
+            <label for="edit-req-appliance" class="settings-label">نوع الجهاز:</label>
+            <input type="text" id="edit-req-appliance" required class="settings-input" placeholder="مثال: غسالة LG" />
+          </div>
+          <div class="settings-field">
+            <label for="edit-req-problem" class="settings-label">المشكلة / العطل:</label>
+            <input type="text" id="edit-req-problem" required class="settings-input" placeholder="مثال: تسريب مياه" />
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+          <div class="settings-field">
+            <label for="edit-req-gov" class="settings-label">المحافظة:</label>
+            <input type="text" id="edit-req-gov" required class="settings-input" placeholder="مثال: الجيزة" />
+          </div>
+          <div class="settings-field">
+            <label for="edit-req-page" class="settings-label">الصفحة المصدر:</label>
+            <input type="text" id="edit-req-page" required class="settings-input" placeholder="مثال: LG" style="text-transform:uppercase;" />
+          </div>
+        </div>
+
+        <div class="settings-field">
+          <label for="edit-req-status-select" class="settings-label">حالة الطلب:</label>
+          <select id="edit-req-status-select" class="settings-input" style="height:44px;font-family:Cairo,sans-serif;font-weight:600;cursor:pointer;">
+            <option value="new">جديد</option>
+            <option value="pending">قيد المتابعة</option>
+            <option value="completed">مكتمل</option>
+            <option value="cancelled">ملغي</option>
+          </select>
+        </div>
+
+        <div style="display:flex;gap:0.75rem;margin-top:1rem;border-top:1px solid var(--clr-border);padding-top:1.25rem;">
+          <button type="button" class="settings-btn-save" style="flex:1;background:var(--clr-surface-2);border-color:var(--clr-border);color:var(--clr-text);" onclick="document.getElementById('modal-edit-request').style.display='none'">إلغاء</button>
+          <button type="submit" class="settings-btn-save" style="flex:1;">حفظ التغييرات</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Language & Region -->
+  <div id="modal-sys-language" class="modal-overlay" style="display:none;">
+    <div class="modal-content glass-card" style="max-width:450px;width:95%;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="color:var(--clr-primary);display:flex;align-items:center;gap:6px;">🌐 اللغة والمنطقة</h3>
+        <button class="modal-close-btn" onclick="closeSysModal('language')">✖</button>
+      </div>
+      <form id="sys-language-form" style="display:flex;flex-direction:column;gap:1.25rem;margin-top:1.25rem;">
+        <div class="settings-field">
+          <label class="settings-label">لغة لوحة التحكم</label>
+          <select id="sys-lang-select" class="settings-input" style="height:44px;">
+            <option value="ar">العربية (RTL)</option>
+            <option value="en">English (LTR)</option>
+          </select>
+        </div>
+        <div class="settings-field">
+          <label class="settings-label">المنطقة الزمنية</label>
+          <select id="sys-tz-select" class="settings-input" style="height:44px;">
+            <option value="Cairo">القاهرة (GMT+3)</option>
+            <option value="Riyadh">الرياض (GMT+3)</option>
+            <option value="Dubai">دبي (GMT+4)</option>
+            <option value="London">لندن (GMT+1)</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:0.75rem;margin-top:1rem;border-top:1px solid var(--clr-border);padding-top:1.25rem;">
+          <button type="button" class="settings-btn-save" style="flex:1;background:var(--clr-surface-2);border-color:var(--clr-border);color:var(--clr-text);" onclick="closeSysModal('language')">إلغاء</button>
+          <button type="submit" class="settings-btn-save" style="flex:1;">حفظ</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Notifications -->
+  <div id="modal-sys-notifications" class="modal-overlay" style="display:none;">
+    <div class="modal-content glass-card" style="max-width:450px;width:95%;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="color:var(--clr-primary);display:flex;align-items:center;gap:6px;">🔔 الإشعارات والتنبيهات</h3>
+        <button class="modal-close-btn" onclick="closeSysModal('notifications')">✖</button>
+      </div>
+      <form id="sys-notifications-form" style="display:flex;flex-direction:column;gap:1.25rem;margin-top:1.25rem;">
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+          <label style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;color:var(--clr-text);font-weight:600;font-size:0.9rem;">
+            <span>📧 تنبيهات البريد الإلكتروني للطلبات الجديدة</span>
+            <input type="checkbox" id="sys-notif-email" checked style="width:20px;height:20px;accent-color:var(--clr-primary);" />
+          </label>
+          <label style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;color:var(--clr-text);font-weight:600;font-size:0.9rem;">
+            <span>💬 إشعارات الواتساب الفورية للعملاء</span>
+            <input type="checkbox" id="sys-notif-wa" checked style="width:20px;height:20px;accent-color:var(--clr-primary);" />
+          </label>
+          <label style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;color:var(--clr-text);font-weight:600;font-size:0.9rem;">
+            <span>🔊 إصدار صوت تنبيه عند وصول طلب جديد</span>
+            <input type="checkbox" id="sys-notif-sound" checked style="width:20px;height:20px;accent-color:var(--clr-primary);" />
+          </label>
+        </div>
+        <div style="display:flex;gap:0.75rem;margin-top:1rem;border-top:1px solid var(--clr-border);padding-top:1.25rem;">
+          <button type="button" class="settings-btn-save" style="flex:1;background:var(--clr-surface-2);border-color:var(--clr-border);color:var(--clr-text);" onclick="closeSysModal('notifications')">إلغاء</button>
+          <button type="submit" class="settings-btn-save" style="flex:1;">حفظ</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Security -->
+  <div id="modal-sys-security" class="modal-overlay" style="display:none;">
+    <div class="modal-content glass-card" style="max-width:450px;width:95%;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="color:var(--clr-primary);display:flex;align-items:center;gap:6px;">🛡️ أمان الحساب</h3>
+        <button class="modal-close-btn" onclick="closeSysModal('security')">✖</button>
+      </div>
+      <form id="sys-security-form" style="display:flex;flex-direction:column;gap:1.25rem;margin-top:1.25rem;">
+        <div class="settings-field">
+          <label class="settings-label">كلمة المرور الحالية</label>
+          <input type="password" id="sys-sec-current" class="settings-input" placeholder="••••••••" required />
+        </div>
+        <div class="settings-field">
+          <label class="settings-label">كلمة المرور الجديدة</label>
+          <input type="password" id="sys-sec-new" class="settings-input" placeholder="••••••••" required />
+        </div>
+        <div class="settings-field">
+          <label class="settings-label">المصادقة الثنائية (2FA)</label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--clr-text);font-size:0.85rem;margin-top:0.25rem;">
+            <input type="checkbox" id="sys-sec-2fa" style="width:16px;height:16px;accent-color:var(--clr-primary);" /> تفعيل المصادقة الثنائية لحماية الحساب
+          </label>
+        </div>
+        <div style="display:flex;gap:0.75rem;margin-top:1rem;border-top:1px solid var(--clr-border);padding-top:1.25rem;">
+          <button type="button" class="settings-btn-save" style="flex:1;background:var(--clr-surface-2);border-color:var(--clr-border);color:var(--clr-text);" onclick="closeSysModal('security')">إلغاء</button>
+          <button type="submit" class="settings-btn-save" style="flex:1;">تحديث الحساب</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Appearance -->
+  <div id="modal-sys-appearance" class="modal-overlay" style="display:none;">
+    <div class="modal-content glass-card" style="max-width:450px;width:95%;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="color:var(--clr-primary);display:flex;align-items:center;gap:6px;">🎨 مظهر لوحة التحكم</h3>
+        <button class="modal-close-btn" onclick="closeSysModal('appearance')">✖</button>
+      </div>
+      <form id="sys-appearance-form" style="display:flex;flex-direction:column;gap:1.25rem;margin-top:1.25rem;">
+        <div class="settings-field">
+          <label class="settings-label">اختر سمة المظهر (Theme)</label>
+          <div style="display:flex;flex-direction:column;gap:0.75rem;">
+            <label style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.02);padding:0.75rem;border-radius:8px;border:1px solid var(--clr-border);cursor:pointer;color:var(--clr-text);font-weight:600;">
+              <span style="display:flex;align-items:center;gap:8px;">🌌 المظهر الداكن الملكي (الافتراضي)</span>
+              <input type="radio" name="sys-theme" value="dark" checked style="width:18px;height:18px;accent-color:var(--clr-primary);" />
+            </label>
+            <label style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.02);padding:0.75rem;border-radius:8px;border:1px solid var(--clr-border);cursor:pointer;color:var(--clr-text);font-weight:600;">
+              <span style="display:flex;align-items:center;gap:8px;">💎 المظهر الزجاجي الفاخر (Glassmorphic)</span>
+              <input type="radio" name="sys-theme" value="glass" style="width:18px;height:18px;accent-color:var(--clr-primary);" />
+            </label>
+            <label style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.02);padding:0.75rem;border-radius:8px;border:1px solid var(--clr-border);cursor:pointer;color:var(--clr-text);font-weight:600;">
+              <span style="display:flex;align-items:center;gap:8px;">☀️ المظهر الفاتح الناصع (Light Theme)</span>
+              <input type="radio" name="sys-theme" value="light" style="width:18px;height:18px;accent-color:var(--clr-primary);" />
+            </label>
+          </div>
+        </div>
+        <div style="display:flex;gap:0.75rem;margin-top:1rem;border-top:1px solid var(--clr-border);padding-top:1.25rem;">
+          <button type="button" class="settings-btn-save" style="flex:1;background:var(--clr-surface-2);border-color:var(--clr-border);color:var(--clr-text);" onclick="closeSysModal('appearance')">إلغاء</button>
+          <button type="submit" class="settings-btn-save" style="flex:1;">تطبيق السمة</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Backup & Restore -->
+  <div id="modal-sys-backup" class="modal-overlay" style="display:none;">
+    <div class="modal-content glass-card" style="max-width:450px;width:95%;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="color:var(--clr-primary);display:flex;align-items:center;gap:6px;">🗄️ النسخ الاحتياطي للبيانات</h3>
+        <button class="modal-close-btn" onclick="closeSysModal('backup')">✖</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:1.25rem;margin-top:1.25rem;text-align:right;">
+        <div style="background:rgba(16,185,129,0.07);border:1px solid rgba(16,185,129,0.2);padding:0.85rem;border-radius:8px;font-size:0.85rem;line-height:1.6;color:var(--clr-text);">
+          تتيح لك هذه اللوحة تحميل نسخة كاملة من بيانات الصيانة والإحصائيات والنشاطات بصيغة JSON، أو استرجاعها في أي وقت.
+        </div>
+        <div style="display:flex;flex-direction:column;gap:0.75rem;">
+          <button id="btn-sys-export" class="settings-btn-save" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:0.75rem;cursor:pointer;">
+            📥 تصدير البيانات بالكامل (Backup)
+          </button>
+          <div style="border-top:1px dashed var(--clr-border);margin:0.5rem 0;"></div>
+          <label style="display:flex;flex-direction:column;gap:0.4rem;cursor:pointer;">
+            <span class="settings-label">استيراد نسخة احتياطية (Restore):</span>
+            <input type="file" id="sys-import-file" accept=".json" class="settings-input" style="padding-top:8px;height:44px;" />
+          </label>
+          <button id="btn-sys-import" class="settings-btn-save" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:0.75rem;background:#3b82f6;border-color:#3b82f6;color:#fff;cursor:pointer;">
+            📤 استرجاع البيانات الآن
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/dashboard/bundle.js?v=2.0.8"></script>
+</body>
+</html>

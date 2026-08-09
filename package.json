@@ -1,0 +1,18 @@
+{
+  "name": "elhandasia-center",
+  "version": "1.0.0",
+  "description": "الهندسية للتوكيلات - Admin Dashboard & Analytics",
+  "type": "module",
+  "scripts": {
+    "build:dashboard": "node build-dashboard.mjs",
+    "convex:dev": "npx convex dev",
+    "convex:deploy": "npx convex deploy"
+  },
+  "dependencies": {
+    "@clerk/clerk-js": "^5.0.0",
+    "convex": "^1.24.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

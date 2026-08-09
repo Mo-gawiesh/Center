@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Environment secrets — NEVER commit these
+.env
+.env.local
+.env.production
+
+# Convex generated files
+convex/_generated/
+
+# Build output
+dashboard/bundle.js
+
+# Python
+__pycache__/
+*.pyc
+
+# OS files
+.DS_Store
+Thumbs.db

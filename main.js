@@ -243,7 +243,7 @@ document.querySelectorAll('a[href^="#"]').forEach(link => {
     const loc = document.getElementById('form-loc').value;
     const appliance = document.getElementById('form-appliance').value;
 
-    const whatsappNumber = '201062842903';
+    const whatsappNumber = window.__WHATSAPP_NUMBER__ || '201062842903';
     
     // Create the message
     const message = `طلب صيانة جديد 🛠️
